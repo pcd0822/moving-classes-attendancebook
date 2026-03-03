@@ -1,0 +1,148 @@
+import type { Handler, HandlerEvent, HandlerContext } from '@netlify/functions';
+import { google } from 'googleapis';
+
+function getAuth() {
+  const raw = process.env.GOOGLE_SERVICE_ACCOUNT_JSON;
+  if (!raw) throw new Error('GOOGLE_SERVICE_ACCOUNT_JSON not set');
+  const key = JSON.parse(raw);
+  const auth = new google.auth.GoogleAuth({
+    credentials: key,
+    scopes: ['https://www.googleapis.com/auth/spreadsheets'],
+  });
+  return auth;
+}
+
+function sheetNameForTeacher(teacherName: string): string {
+  const safe = teacherName.replace(/[\\/*?\[\]:]/g, '_').slice(0, 80);
+  return `출결_${safe}`;
+}
+
+export const handler: Handler = async (event: HandlerEvent, _context: HandlerContext) => {
+  if (event.httpMethod === 'OPTIONS') {
+    return { statusCode: 204, headers: { 'Access-Control-Allow-Origin': '*' } };
+  }
+  const headers = { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' };
+  try {
+    const body = event.body ? JSON.parse(event.body) : {};
+    const { action, spreadsheetId, teacherName, ...rest } = body;
+    const id = spreadsheetId || process.env.SPREADSHEET_ID;
+    if (!id) return { statusCode: 400, headers, body: JSON.stringify({ error: 'spreadsheetId required' }) };
+    if (!teacherName) return { statusCode: 400, headers, body: JSON.stringify({ error: 'teacherName required' }) };
+
+    const sheets = google.sheets({ version: 'v4', auth: getAuth() });
+    const sheetTitle = sheetNameForTeacher(teacherName);
+
+    const ensureSheet = async () => {
+      const meta = await sheets.spreadsheets.get({ spreadsheetId: id });
+      const exists = meta.data.sheets?.some(s => s.properties?.title === sheetTitle);
+      if (!exists) {
+        await sheets.spreadsheets.batchUpdate({
+          spreadsheetId: id,
+          requestBody: {
+            requests: [{ addSheet: { properties: { title: sheetTitle } } }],
+          },
+        });
+      }
+    };
+
+    if (action === 'read') {
+      const res = await sheets.spreadsheets.values.get({
+        spreadsheetId: id,
+        range: `'${sheetTitle}'!A:G`,
+      }).catch(() => ({ data: { values: [] } }));
+      const values = (res.data.values || []) as string[][];
+      const [header, ...rows] = values;
+      if (!header || header[0] !== 'date') return { statusCode: 200, headers, body: JSON.stringify({ records: [] }) };
+      const records = rows.map(row => ({
+        date: row[0],
+        dayindex: Number(row[1]) || 0,
+        period: Number(row[2]) || 0,
+        subjectKey: row[3],
+        studentName: row[4],
+        status: row[5] || '',
+        note: row[6] || '',
+      }));
+      return { statusCode: 200, headers, body: JSON.stringify({ records }) };
+    }
+
+    if (action === 'write') {
+      const { records } = rest as { records: Array<{ date: string; dayindex: number; period: number; subjectKey: string; studentName: string; status: string; note: string }> };
+      await ensureSheet();
+      const rows = records.map(r => [r.date, r.dayindex, r.period, r.subjectKey, r.studentName, r.status, r.note]);
+      const res = await sheets.spreadsheets.values.get({
+        spreadsheetId: id,
+        range: `'${sheetTitle}'!A:G`,
+      }).catch(() => ({ data: { values: [] } }));
+      const values = (res.data.values || []) as string[][];
+      if (values.length === 0) {
+        await sheets.spreadsheets.values.update({
+          spreadsheetId: id,
+          range: `'${sheetTitle}'!A1`,
+          valueInputOption: 'USER_ENTERED',
+          requestBody: { values: [['date', 'dayindex', 'period', 'subjectKey', 'studentName', 'status', 'note'], ...rows] },
+        });
+      } else {
+        await sheets.spreadsheets.values.append({
+          spreadsheetId: id,
+          range: `'${sheetTitle}'!A:G`,
+          valueInputOption: 'USER_ENTERED',
+          insertDataOption: 'INSERT_ROWS',
+          requestBody: { values: rows },
+        });
+      }
+      return { statusCode: 200, headers, body: JSON.stringify({ ok: true }) };
+    }
+
+    if (action === 'setCell') {
+      const { date, dayindex, period, subjectKey, studentName, status, note } = rest as {
+        date: string; dayindex: number; period: number; subjectKey: string; studentName: string; status: string; note: string;
+      };
+      await ensureSheet();
+      const res = await sheets.spreadsheets.values.get({
+        spreadsheetId: id,
+        range: `'${sheetTitle}'!A:G`,
+      }).catch(() => ({ data: { values: [] } }));
+      let values = (res.data.values || []) as string[][];
+      if (values.length === 0) {
+        values = [['date', 'dayindex', 'period', 'subjectKey', 'studentName', 'status', 'note']];
+        await sheets.spreadsheets.values.update({
+          spreadsheetId: id,
+          range: `'${sheetTitle}'!A1`,
+          valueInputOption: 'USER_ENTERED',
+          requestBody: { values },
+        });
+      }
+      const [header, ...dataRows] = values;
+      let rowIndex = -1;
+      for (let i = 0; i < dataRows.length; i++) {
+        const r = dataRows[i];
+        if (r[0] === date && Number(r[1]) === dayindex && Number(r[2]) === period && r[3] === subjectKey && r[4] === studentName) {
+          rowIndex = i + 2;
+          break;
+        }
+      }
+      if (rowIndex > 0) {
+        await sheets.spreadsheets.values.update({
+          spreadsheetId: id,
+          range: `'${sheetTitle}'!F${rowIndex}:G${rowIndex}`,
+          valueInputOption: 'USER_ENTERED',
+          requestBody: { values: [[status, note || '']] },
+        });
+      } else {
+        await sheets.spreadsheets.values.append({
+          spreadsheetId: id,
+          range: `'${sheetTitle}'!A:G`,
+          valueInputOption: 'USER_ENTERED',
+          insertDataOption: 'INSERT_ROWS',
+          requestBody: { values: [[date, dayindex, period, subjectKey, studentName, status, note || '']] },
+        });
+      }
+      return { statusCode: 200, headers, body: JSON.stringify({ ok: true }) };
+    }
+
+    return { statusCode: 400, headers, body: JSON.stringify({ error: 'Unknown action' }) };
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err);
+    return { statusCode: 500, headers, body: JSON.stringify({ error: message }) };
+  }
+};

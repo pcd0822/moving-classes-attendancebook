@@ -1,0 +1,179 @@
+import type { Handler, HandlerEvent, HandlerContext } from '@netlify/functions';
+import { google } from 'googleapis';
+
+const SHEET_SUBJECTS = '과목출석부';
+const SHEET_TIMETABLE = '교사시간표';
+const SHEET_TEACHER_CONFIG = '교사_설정';
+
+function getAuth() {
+  const raw = process.env.GOOGLE_SERVICE_ACCOUNT_JSON;
+  if (!raw) throw new Error('GOOGLE_SERVICE_ACCOUNT_JSON not set');
+  const key = JSON.parse(raw);
+  const auth = new google.auth.GoogleAuth({
+    credentials: key,
+    scopes: ['https://www.googleapis.com/auth/spreadsheets'],
+  });
+  return auth;
+}
+
+function getSheetsClient() {
+  const auth = getAuth();
+  return google.sheets({ version: 'v4', auth });
+}
+
+export const handler: Handler = async (event: HandlerEvent, _context: HandlerContext) => {
+  if (event.httpMethod === 'OPTIONS') {
+    return { statusCode: 204, headers: { 'Access-Control-Allow-Origin': '*' } };
+  }
+  const headers = { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' };
+  try {
+    const body = event.body ? JSON.parse(event.body) : {};
+    const { action, spreadsheetId, ...rest } = body;
+    const id = spreadsheetId || process.env.SPREADSHEET_ID;
+    if (!id) return { statusCode: 400, headers, body: JSON.stringify({ error: 'spreadsheetId required' }) };
+
+    const sheets = getSheetsClient();
+
+    if (action === 'writeSubjects') {
+      const { blocks } = rest as { blocks: Array<{ subject: string; time: string; room: string; teachers: string[]; count: number; students: Array<{ order: number; grade: string; class: string; number: string; name: string }> }> };
+      const rows: (string | number)[][] = [['time', 'subject', 'subjectKey', 'room', 'teachers', 'count', 'studentsJson']];
+      for (const b of blocks) {
+        const subjectKey = `${b.time}${b.subject}`;
+        const studentsJson = JSON.stringify(b.students);
+        rows.push([b.time, b.subject, subjectKey, b.room, (b.teachers || []).join(','), b.count, studentsJson]);
+      }
+      await sheets.spreadsheets.values.clear({
+        spreadsheetId: id,
+        range: `${SHEET_SUBJECTS}!A:G`,
+      }).catch(() => {});
+      await sheets.spreadsheets.values.update({
+        spreadsheetId: id,
+        range: `${SHEET_SUBJECTS}!A1`,
+        valueInputOption: 'USER_ENTERED',
+        requestBody: { values: rows },
+      });
+      return { statusCode: 200, headers, body: JSON.stringify({ ok: true }) };
+    }
+
+    if (action === 'writeTimetable') {
+      const { rows: timetableRows } = rest as { rows: Array<{ teachername: string; dayindex: number; period: number; subject: string; room: string }> };
+      const rows: (string | number)[][] = [['teachername', 'dayindex', 'period', 'subject', 'room']];
+      for (const r of timetableRows) {
+        rows.push([r.teachername, r.dayindex, r.period, r.subject, r.room]);
+      }
+      await sheets.spreadsheets.values.clear({
+        spreadsheetId: id,
+        range: `${SHEET_TIMETABLE}!A:E`,
+      }).catch(() => {});
+      await sheets.spreadsheets.values.update({
+        spreadsheetId: id,
+        range: `${SHEET_TIMETABLE}!A1`,
+        valueInputOption: 'USER_ENTERED',
+        requestBody: { values: rows },
+      });
+      return { statusCode: 200, headers, body: JSON.stringify({ ok: true }) };
+    }
+
+    if (action === 'readSubjects') {
+      const res = await sheets.spreadsheets.values.get({
+        spreadsheetId: id,
+        range: `${SHEET_SUBJECTS}!A:G`,
+      });
+      const values = (res.data.values || []) as string[][];
+      const [header, ...data] = values;
+      if (!header || header[0] !== 'time') return { statusCode: 200, headers, body: JSON.stringify({ rows: [] }) };
+      const rows = data.map(row => ({
+        time: row[0],
+        subject: row[1],
+        subjectKey: row[2],
+        room: row[3],
+        teachers: (row[4] || '').split(',').map(t => t.trim()).filter(Boolean),
+        count: Number(row[5]) || 0,
+        students: (() => { try { return JSON.parse(row[6] || '[]'); } catch { return []; } })(),
+      }));
+      return { statusCode: 200, headers, body: JSON.stringify({ rows }) };
+    }
+
+    if (action === 'readTimetable') {
+      const res = await sheets.spreadsheets.values.get({
+        spreadsheetId: id,
+        range: `${SHEET_TIMETABLE}!A:E`,
+      });
+      const values = (res.data.values || []) as string[][];
+      const [header, ...data] = values;
+      if (!header || header[0] !== 'teachername') return { statusCode: 200, headers, body: JSON.stringify({ rows: [] }) };
+      const rows = data.map(row => ({
+        teachername: row[0],
+        dayindex: Number(row[1]) || 0,
+        period: Number(row[2]) || 0,
+        subject: row[3],
+        room: row[4],
+      }));
+      return { statusCode: 200, headers, body: JSON.stringify({ rows }) };
+    }
+
+    if (action === 'saveTeacherConfig') {
+      const { uid, teacherName } = rest as { uid: string; teacherName: string };
+      if (!uid || !teacherName) return { statusCode: 400, headers, body: JSON.stringify({ error: 'uid, teacherName required' }) };
+      const meta = await sheets.spreadsheets.get({ spreadsheetId: id });
+      const has = meta.data.sheets?.some(s => s.properties?.title === SHEET_TEACHER_CONFIG);
+      if (!has) {
+        await sheets.spreadsheets.batchUpdate({
+          spreadsheetId: id,
+          requestBody: { requests: [{ addSheet: { properties: { title: SHEET_TEACHER_CONFIG } } }] },
+        });
+      }
+      const res = await sheets.spreadsheets.values.get({
+        spreadsheetId: id,
+        range: `${SHEET_TEACHER_CONFIG}!A:C`,
+      }).catch(() => ({ data: { values: [] } }));
+      const values = (res.data.values || []) as string[][];
+      const [h, ...dataRows] = values;
+      const newRow = [uid, teacherName, id];
+      const idx = dataRows.findIndex(r => r[0] === uid);
+      if (idx >= 0) {
+        await sheets.spreadsheets.values.update({
+          spreadsheetId: id,
+          range: `${SHEET_TEACHER_CONFIG}!A${idx + 2}:C${idx + 2}`,
+          valueInputOption: 'USER_ENTERED',
+          requestBody: { values: [newRow] },
+        });
+      } else {
+        if (!h || h[0] !== 'uid') {
+          await sheets.spreadsheets.values.update({
+            spreadsheetId: id,
+            range: `${SHEET_TEACHER_CONFIG}!A1:C1`,
+            valueInputOption: 'USER_ENTERED',
+            requestBody: { values: [['uid', 'teacherName', 'spreadsheetId']] },
+          });
+        }
+        await sheets.spreadsheets.values.append({
+          spreadsheetId: id,
+          range: `${SHEET_TEACHER_CONFIG}!A:C`,
+          valueInputOption: 'USER_ENTERED',
+          insertDataOption: 'INSERT_ROWS',
+          requestBody: { values: [newRow] },
+        });
+      }
+      return { statusCode: 200, headers, body: JSON.stringify({ ok: true }) };
+    }
+
+    if (action === 'getTeacherConfig') {
+      const { uid } = rest as { uid: string };
+      if (!uid) return { statusCode: 400, headers, body: JSON.stringify({ error: 'uid required' }) };
+      const res = await sheets.spreadsheets.values.get({
+        spreadsheetId: id,
+        range: `${SHEET_TEACHER_CONFIG}!A:C`,
+      });
+      const values = (res.data.values || []) as string[][];
+      const [, ...rows] = values;
+      const row = rows.find(r => r[0] === uid);
+      return { statusCode: 200, headers, body: JSON.stringify({ teacherName: row?.[1] || null, spreadsheetId: row?.[2] || id }) };
+    }
+
+    return { statusCode: 400, headers, body: JSON.stringify({ error: 'Unknown action' }) };
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err);
+    return { statusCode: 500, headers, body: JSON.stringify({ error: message }) };
+  }
+};
