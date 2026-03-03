@@ -67,7 +67,18 @@ export function parseAttendanceExcel(file: File): Promise<SubjectBlock[]> {
 
           const students: SubjectStudent[] = [];
           let r = blockStart + 6;
-          while (r < maxRow && !isEmptyRow(sheet, r)) {
+          while (r < maxRow) {
+            if (isEmptyRow(sheet, r)) {
+              const nextAlsoEmpty = r + 1 < maxRow && isEmptyRow(sheet, r + 1);
+              const nextLooksLikeBlockStart =
+                r + 1 < maxRow &&
+                !isEmptyRow(sheet, r + 1) &&
+                (sheet[XLSX.utils.encode_cell({ r: r + 1, c: 0 })]?.v == null || String(sheet[XLSX.utils.encode_cell({ r: r + 1, c: 0 })]?.v).trim() === '') &&
+                (sheet[XLSX.utils.encode_cell({ r: r + 1, c: 1 })]?.v != null && String(sheet[XLSX.utils.encode_cell({ r: r + 1, c: 1 })]?.v).trim() !== '');
+              if (nextAlsoEmpty || nextLooksLikeBlockStart) break;
+              r++;
+              continue;
+            }
             const a = sheet[XLSX.utils.encode_cell({ r, c: 0 })]?.v;
             const b = sheet[XLSX.utils.encode_cell({ r, c: 1 })]?.v;
             const c = sheet[XLSX.utils.encode_cell({ r, c: 2 })]?.v;
@@ -83,7 +94,8 @@ export function parseAttendanceExcel(file: File): Promise<SubjectBlock[]> {
             r++;
           }
           blocks.push({ subject, time, room, teachers, count, students });
-          row = r + 3;
+          row = r + 1;
+          while (row < maxRow && (isEmptyRow(sheet, row) || isMovingGroupRow(sheet, row))) row++;
         }
         resolve(blocks);
       } catch (err) {
