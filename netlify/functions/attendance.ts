@@ -1,10 +1,17 @@
 import type { Handler, HandlerEvent, HandlerContext } from '@netlify/functions';
 import { google } from 'googleapis';
 
+function normalizeServiceAccountKey(key: Record<string, unknown>): Record<string, unknown> {
+  if (key.private_key && typeof key.private_key === 'string') {
+    key.private_key = key.private_key.replace(/\\n/g, '\n');
+  }
+  return key;
+}
+
 function getAuth() {
   const raw = process.env.GOOGLE_SERVICE_ACCOUNT_JSON;
   if (!raw) throw new Error('GOOGLE_SERVICE_ACCOUNT_JSON not set');
-  const key = JSON.parse(raw);
+  const key = normalizeServiceAccountKey(JSON.parse(raw) as Record<string, unknown>);
   const auth = new google.auth.GoogleAuth({
     credentials: key,
     scopes: ['https://www.googleapis.com/auth/spreadsheets'],
