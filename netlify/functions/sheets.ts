@@ -82,7 +82,19 @@ export const handler: Handler = async (event: HandlerEvent, _context: HandlerCon
 
     const sheets = getSheetsClient();
 
+    const ensureSheet = async (title: string) => {
+      const meta = await sheets.spreadsheets.get({ spreadsheetId: id });
+      const exists = meta.data.sheets?.some(s => s.properties?.title === title);
+      if (!exists) {
+        await sheets.spreadsheets.batchUpdate({
+          spreadsheetId: id,
+          requestBody: { requests: [{ addSheet: { properties: { title } } }] },
+        });
+      }
+    };
+
     if (action === 'writeSubjects') {
+      await ensureSheet(SHEET_SUBJECTS);
       const { blocks } = rest as { blocks: Array<{ subject: string; time: string; room: string; teachers: string[]; count: number; students: Array<{ order: number; grade: string; class: string; number: string; name: string }> }> };
       const rows: (string | number)[][] = [['time', 'subject', 'subjectKey', 'room', 'teachers', 'count', 'studentsJson']];
       for (const b of blocks) {
@@ -92,11 +104,11 @@ export const handler: Handler = async (event: HandlerEvent, _context: HandlerCon
       }
       await sheets.spreadsheets.values.clear({
         spreadsheetId: id,
-        range: `${SHEET_SUBJECTS}!A:G`,
+        range: `'${SHEET_SUBJECTS}'!A:G`,
       }).catch(() => {});
       await sheets.spreadsheets.values.update({
         spreadsheetId: id,
-        range: `${SHEET_SUBJECTS}!A1`,
+        range: `'${SHEET_SUBJECTS}'!A1`,
         valueInputOption: 'USER_ENTERED',
         requestBody: { values: rows },
       });
@@ -104,6 +116,7 @@ export const handler: Handler = async (event: HandlerEvent, _context: HandlerCon
     }
 
     if (action === 'writeTimetable') {
+      await ensureSheet(SHEET_TIMETABLE);
       const { rows: timetableRows } = rest as { rows: Array<{ teachername: string; dayindex: number; period: number; subject: string; room: string }> };
       const rows: (string | number)[][] = [['teachername', 'dayindex', 'period', 'subject', 'room']];
       for (const r of timetableRows) {
@@ -111,11 +124,11 @@ export const handler: Handler = async (event: HandlerEvent, _context: HandlerCon
       }
       await sheets.spreadsheets.values.clear({
         spreadsheetId: id,
-        range: `${SHEET_TIMETABLE}!A:E`,
+        range: `'${SHEET_TIMETABLE}'!A:E`,
       }).catch(() => {});
       await sheets.spreadsheets.values.update({
         spreadsheetId: id,
-        range: `${SHEET_TIMETABLE}!A1`,
+        range: `'${SHEET_TIMETABLE}'!A1`,
         valueInputOption: 'USER_ENTERED',
         requestBody: { values: rows },
       });
@@ -125,8 +138,8 @@ export const handler: Handler = async (event: HandlerEvent, _context: HandlerCon
     if (action === 'readSubjects') {
       const res = await sheets.spreadsheets.values.get({
         spreadsheetId: id,
-        range: `${SHEET_SUBJECTS}!A:G`,
-      });
+        range: `'${SHEET_SUBJECTS}'!A:G`,
+      }).catch(() => ({ data: { values: [] } }));
       const values = (res.data.values || []) as string[][];
       const [header, ...data] = values;
       if (!header || header[0] !== 'time') return { statusCode: 200, headers, body: JSON.stringify({ rows: [] }) };
@@ -145,8 +158,8 @@ export const handler: Handler = async (event: HandlerEvent, _context: HandlerCon
     if (action === 'readTimetable') {
       const res = await sheets.spreadsheets.values.get({
         spreadsheetId: id,
-        range: `${SHEET_TIMETABLE}!A:E`,
-      });
+        range: `'${SHEET_TIMETABLE}'!A:E`,
+      }).catch(() => ({ data: { values: [] } }));
       const values = (res.data.values || []) as string[][];
       const [header, ...data] = values;
       if (!header || header[0] !== 'teachername') return { statusCode: 200, headers, body: JSON.stringify({ rows: [] }) };
@@ -173,7 +186,7 @@ export const handler: Handler = async (event: HandlerEvent, _context: HandlerCon
       }
       const res = await sheets.spreadsheets.values.get({
         spreadsheetId: id,
-        range: `${SHEET_TEACHER_CONFIG}!A:C`,
+        range: `'${SHEET_TEACHER_CONFIG}'!A:C`,
       }).catch(() => ({ data: { values: [] } }));
       const values = (res.data.values || []) as string[][];
       const [h, ...dataRows] = values;
@@ -182,7 +195,7 @@ export const handler: Handler = async (event: HandlerEvent, _context: HandlerCon
       if (idx >= 0) {
         await sheets.spreadsheets.values.update({
           spreadsheetId: id,
-          range: `${SHEET_TEACHER_CONFIG}!A${idx + 2}:C${idx + 2}`,
+          range: `'${SHEET_TEACHER_CONFIG}'!A${idx + 2}:C${idx + 2}`,
           valueInputOption: 'USER_ENTERED',
           requestBody: { values: [newRow] },
         });
@@ -190,14 +203,14 @@ export const handler: Handler = async (event: HandlerEvent, _context: HandlerCon
         if (!h || h[0] !== 'uid') {
           await sheets.spreadsheets.values.update({
             spreadsheetId: id,
-            range: `${SHEET_TEACHER_CONFIG}!A1:C1`,
+            range: `'${SHEET_TEACHER_CONFIG}'!A1:C1`,
             valueInputOption: 'USER_ENTERED',
             requestBody: { values: [['uid', 'teacherName', 'spreadsheetId']] },
           });
         }
         await sheets.spreadsheets.values.append({
           spreadsheetId: id,
-          range: `${SHEET_TEACHER_CONFIG}!A:C`,
+          range: `'${SHEET_TEACHER_CONFIG}'!A:C`,
           valueInputOption: 'USER_ENTERED',
           insertDataOption: 'INSERT_ROWS',
           requestBody: { values: [newRow] },
@@ -211,7 +224,7 @@ export const handler: Handler = async (event: HandlerEvent, _context: HandlerCon
       if (!uid) return { statusCode: 400, headers, body: JSON.stringify({ error: 'uid required' }) };
       const res = await sheets.spreadsheets.values.get({
         spreadsheetId: id,
-        range: `${SHEET_TEACHER_CONFIG}!A:C`,
+        range: `'${SHEET_TEACHER_CONFIG}'!A:C`,
       });
       const values = (res.data.values || []) as string[][];
       const [, ...rows] = values;
