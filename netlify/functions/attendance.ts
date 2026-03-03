@@ -10,8 +10,22 @@ function normalizeServiceAccountKey(key: Record<string, unknown>): Record<string
 
 function getAuth() {
   const raw = process.env.GOOGLE_SERVICE_ACCOUNT_JSON;
-  if (!raw) throw new Error('GOOGLE_SERVICE_ACCOUNT_JSON not set');
-  const key = normalizeServiceAccountKey(JSON.parse(raw) as Record<string, unknown>);
+  const clientEmail = process.env.GOOGLE_CLIENT_EMAIL;
+  const privateKeyEnv = process.env.GOOGLE_PRIVATE_KEY;
+
+  let key: Record<string, unknown>;
+
+  if (raw) {
+    key = normalizeServiceAccountKey(JSON.parse(raw) as Record<string, unknown>);
+  } else if (clientEmail && privateKeyEnv) {
+    key = normalizeServiceAccountKey({
+      client_email: clientEmail,
+      private_key: privateKeyEnv,
+    } as Record<string, unknown>);
+  } else {
+    throw new Error('Service account credentials not set');
+  }
+
   const auth = new google.auth.GoogleAuth({
     credentials: key,
     scopes: ['https://www.googleapis.com/auth/spreadsheets'],
