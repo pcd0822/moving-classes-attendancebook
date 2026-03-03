@@ -1,16 +1,22 @@
 :root {
-  --pastel-rose: #fce4ec;
-  --pastel-pink: #f8bbd9;
-  --pastel-red: #f48fb1;
-  --pastel-coral: #ffab91;
-  --pastel-mint: #c8e6c9;
-  --pastel-cream: #fff8e1;
-  --text: #5d4037;
-  --text-muted: #8d6e63;
-  --border: #e0beb4;
-  --today-bg: #ffecb3;
-  --white: #fff;
-  --shadow: rgba(94, 53, 62, 0.12);
+  --white: #ffffff;
+  --red-50: #fef2f2;
+  --red-100: #fee2e2;
+  --red-200: #fecaca;
+  --red-300: #fca5a5;
+  --red-500: #ef4444;
+  --red-600: #dc2626;
+  --red-700: #b91c1c;
+  --yellow-400: #facc15;
+  --yellow-500: #eab308;
+  --yellow-600: #ca8a04;
+  --text: #1f2937;
+  --text-muted: #6b7280;
+  --border: #e5e7eb;
+  --today-bg: #fef9c3;
+  --shadow: rgba(0, 0, 0, 0.08);
+  --accent: var(--yellow-500);
+  --bg-page: var(--red-50);
 }
 
 * {
@@ -19,8 +25,8 @@
 
 body {
   margin: 0;
-  font-family: 'Segoe UI', 'Malgun Gothic', sans-serif;
-  background: linear-gradient(160deg, var(--pastel-rose) 0%, var(--pastel-cream) 100%);
+  font-family: 'Open Sans', 'Malgun Gothic', sans-serif;
+  background: var(--bg-page);
   color: var(--text);
   min-height: 100vh;
 }
@@ -31,15 +37,15 @@ body {
 
 button {
   cursor: pointer;
-  font-family: inherit;
+  font-family: 'Open Sans', inherit;
 }
 
 input, select, textarea {
-  font-family: inherit;
+  font-family: 'Open Sans', inherit;
 }
 
 a {
-  color: var(--pastel-red);
+  color: var(--red-600);
   text-decoration: none;
 }
 

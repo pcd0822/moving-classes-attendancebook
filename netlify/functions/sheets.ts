@@ -160,15 +160,16 @@ export const handler: Handler = async (event: HandlerEvent, _context: HandlerCon
         spreadsheetId: id,
         range: `'${SHEET_TIMETABLE}'!A:E`,
       }).catch(() => ({ data: { values: [] } }));
-      const values = (res.data.values || []) as string[][];
+      const values = (res.data.values || []) as (string | number)[][];
       const [header, ...data] = values;
-      if (!header || header[0] !== 'teachername') return { statusCode: 200, headers, body: JSON.stringify({ rows: [] }) };
+      const firstHeader = header && String(header[0] ?? '').toLowerCase().replace(/\s/g, '');
+      if (!header || firstHeader !== 'teachername') return { statusCode: 200, headers, body: JSON.stringify({ rows: [] }) };
       const rows = data.map(row => ({
-        teachername: row[0],
+        teachername: String(row[0] ?? '').trim(),
         dayindex: Number(row[1]) || 0,
         period: Number(row[2]) || 0,
-        subject: row[3],
-        room: row[4],
+        subject: String(row[3] ?? '').trim(),
+        room: String(row[4] ?? '').trim(),
       }));
       return { statusCode: 200, headers, body: JSON.stringify({ rows }) };
     }

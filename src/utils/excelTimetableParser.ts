@@ -14,11 +14,12 @@ export function parseTeacherTimetableExcel(file: File): Promise<TeacherTimetable
         const rows = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as unknown[][];
         if (rows.length < 2) return resolve([]);
         const header = rows[0] as string[];
-        const teachernameIdx = header.findIndex(h => String(h).toLowerCase() === 'teachername');
-        const dayindexIdx = header.findIndex(h => String(h).toLowerCase() === 'dayindex');
-        const periodIdx = header.findIndex(h => String(h).toLowerCase() === 'period');
-        const subjectIdx = header.findIndex(h => String(h).toLowerCase() === 'subject');
-        const roomIdx = header.findIndex(h => String(h).toLowerCase() === 'room');
+        const norm = (s: string) => String(s).toLowerCase().replace(/\s/g, '');
+        const teachernameIdx = header.findIndex(h => norm(h) === 'teachername');
+        const dayindexIdx = header.findIndex(h => norm(h) === 'dayindex');
+        const periodIdx = header.findIndex(h => norm(h) === 'period');
+        const subjectIdx = header.findIndex(h => norm(h) === 'subject');
+        const roomIdx = header.findIndex(h => norm(h) === 'room');
         if ([teachernameIdx, dayindexIdx, periodIdx, subjectIdx, roomIdx].some(i => i === -1)) {
           return reject(new Error('헤더: teachername, dayindex, period, subject, room 이 필요합니다.'));
         }

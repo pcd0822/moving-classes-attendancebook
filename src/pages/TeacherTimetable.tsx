@@ -65,9 +65,10 @@ export default function TeacherTimetable() {
   }, [teacherName, spreadsheetId, nav]);
 
   const myTimetable = useMemo(() => {
-    const normalized = teacherName?.trim().toLowerCase() ?? '';
+    const norm = (s: string) => (s || '').trim().toLowerCase().replace(/\s+/g, ' ');
+    const normalized = norm(teacherName ?? '');
     const my = timetableRows.filter(
-      r => r.teachername.trim().toLowerCase() === normalized
+      r => norm(r.teachername) === normalized
     );
     const grid: (TimetableCell | null)[][] = Array(7).fill(null).map(() => Array(5).fill(null));
     for (const r of my) {
@@ -164,7 +165,7 @@ export default function TeacherTimetable() {
         <table style={{ width: '100%', minWidth: 600, borderCollapse: 'collapse', background: 'var(--white)', borderRadius: 12, overflow: 'hidden', boxShadow: '0 2px 12px var(--shadow)' }}>
           <thead>
             <tr>
-              <th style={{ padding: 12, background: 'var(--pastel-pink)', width: 64 }}>교시</th>
+              <th style={{ padding: 12, background: 'var(--red-200)', width: 64 }}>교시</th>
               {weekRange.labels.map((l, i) => (
                 <th key={i} style={{ padding: 12, background: isToday(l.date) ? 'var(--today-bg)' : 'var(--pastel-pink)' }}>
                   {l.label}
@@ -175,7 +176,7 @@ export default function TeacherTimetable() {
           <tbody>
             {[1, 2, 3, 4, 5, 6, 7].map(period => (
               <tr key={period}>
-                <td style={{ padding: 10, background: 'var(--pastel-rose)', fontWeight: 600 }}>{PERIOD_LABELS[period - 1]}</td>
+                <td style={{ padding: 10, background: 'var(--red-100)', fontWeight: 600 }}>{PERIOD_LABELS[period - 1]}</td>
                 {[0, 1, 2, 3, 4].map(dayindex => {
                   const cell = myTimetable[period - 1]?.[dayindex];
                   const dayDate = addDays(weekRange.start, dayindex);
@@ -194,7 +195,7 @@ export default function TeacherTimetable() {
                       {cell ? (
                         <div
                           style={{
-                            background: 'var(--pastel-rose)',
+                            background: 'var(--red-100)',
                             borderRadius: 8,
                             padding: 10,
                             cursor: 'pointer',
@@ -203,7 +204,7 @@ export default function TeacherTimetable() {
                           onClick={() => handleCellClick(dayindex, period)}
                         >
                           <div style={{ fontWeight: 700, marginBottom: 4 }}>{cell.subject}</div>
-                          <div style={{ fontSize: 12, color: 'var(--text-muted)', background: 'var(--pastel-mint)', padding: '2px 6px', borderRadius: 4, display: 'inline-block' }}>
+                          <div style={{ fontSize: 12, color: 'var(--text-muted)', background: 'var(--yellow-400)', padding: '2px 6px', borderRadius: 4, display: 'inline-block' }}>
                             {cell.room}
                           </div>
                           <button
@@ -211,7 +212,7 @@ export default function TeacherTimetable() {
                             style={{ position: 'absolute', top: 8, right: 8, padding: 4, border: 'none', background: 'transparent', cursor: 'pointer' }}
                             title="엑셀 다운로드"
                           >
-                            <FileSpreadsheet size={18} color="var(--pastel-red)" />
+                            <FileSpreadsheet size={18} color="var(--accent)" />
                           </button>
                         </div>
                       ) : (

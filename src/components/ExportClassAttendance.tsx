@@ -186,7 +186,7 @@ export default function ExportClassAttendance({ subjects, weekStart, attendanceR
             fontSize: 16,
             fontWeight: 600,
             color: 'var(--white)',
-            background: 'var(--pastel-red)',
+            background: 'var(--accent)',
             border: 'none',
             borderRadius: 12,
           }}

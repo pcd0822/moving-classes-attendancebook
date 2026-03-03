@@ -89,7 +89,7 @@ export default function AttendanceModal({ weekStart, cell, subjectInfo, attendan
                         height: 32,
                         border: '1px solid var(--border)',
                         borderRadius: 6,
-                        background: rec?.status ? 'var(--pastel-mint)' : 'var(--white)',
+                        background: rec?.status ? 'var(--yellow-400)' : 'var(--white)',
                         cursor: 'pointer',
                         fontSize: 16,
                       }}

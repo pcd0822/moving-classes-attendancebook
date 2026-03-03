@@ -125,7 +125,7 @@ export default function TeacherStart() {
           fontSize: 16,
           fontWeight: 600,
           color: 'var(--white)',
-          background: 'var(--pastel-red)',
+          background: 'var(--accent)',
           border: 'none',
           borderRadius: 12,
           display: 'flex',

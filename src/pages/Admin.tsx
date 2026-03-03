@@ -90,7 +90,7 @@ export default function Admin() {
         <button
           type="button"
           onClick={() => attendanceInput.current?.click()}
-          style={{ padding: '12px 20px', borderRadius: 8, border: '1px dashed var(--border)', background: 'var(--pastel-rose)', display: 'flex', alignItems: 'center', gap: 8 }}
+          style={{ padding: '12px 20px', borderRadius: 8, border: '1px dashed var(--border)', background: 'var(--red-100)', display: 'flex', alignItems: 'center', gap: 8 }}
         >
           <Upload size={18} /> {attendanceFile ? attendanceFile.name : '파일 선택'}
         </button>
@@ -103,7 +103,7 @@ export default function Admin() {
         <button
           type="button"
           onClick={() => timetableInput.current?.click()}
-          style={{ padding: '12px 20px', borderRadius: 8, border: '1px dashed var(--border)', background: 'var(--pastel-rose)', display: 'flex', alignItems: 'center', gap: 8 }}
+          style={{ padding: '12px 20px', borderRadius: 8, border: '1px dashed var(--border)', background: 'var(--red-100)', display: 'flex', alignItems: 'center', gap: 8 }}
         >
           <Upload size={18} /> {timetableFile ? timetableFile.name : '파일 선택'}
         </button>
@@ -118,7 +118,7 @@ export default function Admin() {
           fontSize: 16,
           fontWeight: 600,
           color: 'var(--white)',
-          background: 'var(--pastel-red)',
+          background: 'var(--accent)',
           border: 'none',
           borderRadius: 12,
         }}
@@ -126,7 +126,7 @@ export default function Admin() {
         {loading ? '저장 중...' : 'DB 제작 및 저장'}
       </button>
       {done && (
-        <div style={{ marginTop: 24, padding: 16, background: 'var(--pastel-mint)', borderRadius: 12 }}>
+        <div style={{ marginTop: 24, padding: 16, background: 'var(--yellow-400)', borderRadius: 12 }}>
           <p style={{ margin: '0 0 8px', fontWeight: 600 }}>저장 완료</p>
           <p style={{ margin: '0 0 8px', fontSize: 14 }}>아래 링크를 교사들에게 공유하세요.</p>
           <div style={{ display: 'flex', gap: 8 }}>

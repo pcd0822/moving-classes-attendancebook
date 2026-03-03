@@ -14,7 +14,7 @@ export default function Guide() {
 
       <section style={{ background: 'var(--white)', borderRadius: 16, padding: 24, boxShadow: '0 4px 20px var(--shadow)', marginBottom: 24 }}>
         <h2 style={{ display: 'flex', alignItems: 'center', gap: 8, margin: '0 0 16px', fontSize: 18 }}>
-          <BookOpen size={22} color="var(--pastel-red)" />
+          <BookOpen size={22} color="var(--red-600)" />
           사용 방법 안내
         </h2>
         <ul style={{ margin: 0, paddingLeft: 20, lineHeight: 1.8, color: 'var(--text)' }}>
@@ -32,7 +32,7 @@ export default function Guide() {
           fontSize: 16,
           fontWeight: 600,
           color: 'var(--white)',
-          background: 'linear-gradient(135deg, var(--pastel-red), var(--pastel-coral))',
+          background: 'var(--accent)',
           border: 'none',
           borderRadius: 12,
           display: 'flex',
