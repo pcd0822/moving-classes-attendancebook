@@ -13,7 +13,11 @@
   --text: #1f2937;
   --text-muted: #6b7280;
   --border: #e5e7eb;
-  --today-bg: #fef9c3;
+  /* 시간표: 흰 배경 + 진한 빨강, 오늘은 불투명 노랑 */
+  --timetable-red: #b91c1c;
+  --timetable-red-light: #fecaca;
+  --timetable-red-border: #fca5a5;
+  --today-bg: #fef08a;
   --shadow: rgba(0, 0, 0, 0.08);
   --accent: var(--yellow-500);
   --bg-page: var(--red-50);
@@ -21,6 +25,7 @@
 
 * {
   box-sizing: border-box;
+  font-family: inherit;
 }
 
 body {
@@ -51,4 +56,9 @@ a {
 
 a:hover {
   text-decoration: underline;
+}
+
+/* 전체 Open Sans 적용 (body 상속 + 테이블/레이블 명시) */
+table, th, td, label, h1, h2, h3, p, span {
+  font-family: 'Open Sans', 'Malgun Gothic', sans-serif;
 }

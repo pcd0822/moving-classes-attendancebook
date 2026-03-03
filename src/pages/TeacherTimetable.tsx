@@ -151,9 +151,10 @@ export default function TeacherTimetable() {
   if (error) return <div style={{ padding: 48, color: '#c62828' }}>{error}</div>;
 
   return (
-    <div style={{ padding: 24, paddingRight: modalCell ? 420 : 24, transition: 'padding-right 0.2s' }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12, marginBottom: 16 }}>
-        <h1 style={{ margin: 0 }}>{teacherName} 선생님 시간표</h1>
+    <div style={{ display: 'flex', width: '100%', minHeight: '100vh', fontFamily: "'Open Sans', 'Malgun Gothic', sans-serif" }}>
+      <div style={{ flex: modalCell ? '0 0 60%' : 1, padding: 24, overflow: 'auto', transition: 'flex 0.2s', minWidth: 0 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12, marginBottom: 12 }}>
+        <h1 style={{ margin: 0, fontSize: 20 }}>{teacherName} 선생님 시간표</h1>
         <div style={{ display: 'flex', gap: 8 }}>
           <button
             onClick={() => setExportOpen(true)}
@@ -163,10 +164,10 @@ export default function TeacherTimetable() {
           </button>
         </div>
       </div>
-      <p style={{ color: 'var(--text-muted)', marginBottom: 16 }}>
+      <p style={{ color: 'var(--text-muted)', marginBottom: 12, fontSize: 13 }}>
         {formatWeekLabel(weekRange.start)}
         {timetableRows.length >= 0 && (
-          <span style={{ marginLeft: 12, fontSize: 13 }}>· 교사시간표 시트 {timetableRows.length}건 조회됨</span>
+          <span style={{ marginLeft: 12 }}>· 교사시간표 시트 {timetableRows.length}건 조회됨</span>
         )}
       </p>
 
@@ -182,12 +183,12 @@ export default function TeacherTimetable() {
       )}
 
       <div style={{ overflowX: 'auto' }}>
-        <table style={{ width: '100%', minWidth: 600, borderCollapse: 'collapse', background: 'var(--white)', borderRadius: 12, overflow: 'hidden', boxShadow: '0 2px 12px var(--shadow)' }}>
+        <table style={{ width: '100%', maxWidth: 520, minWidth: 380, borderCollapse: 'collapse', background: 'var(--white)', borderRadius: 10, overflow: 'hidden', boxShadow: '0 2px 8px var(--shadow)', fontSize: 13 }}>
           <thead>
             <tr>
-              <th style={{ padding: 12, background: 'var(--red-200)', width: 64 }}>교시</th>
+              <th style={{ padding: 8, background: 'var(--timetable-red)', color: 'var(--white)', width: 52, fontSize: 12 }}>교시</th>
               {weekRange.labels.map((l, i) => (
-                <th key={i} style={{ padding: 12, background: isToday(l.date) ? 'var(--today-bg)' : 'var(--red-200)' }}>
+                <th key={i} style={{ padding: 8, background: isToday(l.date) ? 'var(--today-bg)' : 'var(--timetable-red)', color: isToday(l.date) ? 'var(--text)' : 'var(--white)', fontSize: 12 }}>
                   {l.label}
                 </th>
               ))}
@@ -196,7 +197,7 @@ export default function TeacherTimetable() {
           <tbody>
             {[1, 2, 3, 4, 5, 6, 7].map(period => (
               <tr key={period}>
-                <td style={{ padding: 10, background: 'var(--red-100)', fontWeight: 600 }}>{PERIOD_LABELS[period - 1]}</td>
+                <td style={{ padding: 6, background: 'var(--timetable-red-light)', fontWeight: 600, fontSize: 12 }}>{PERIOD_LABELS[period - 1]}</td>
                 {[0, 1, 2, 3, 4].map(dayindex => {
                   const cell = myTimetable[period - 1]?.[dayindex];
                   const dayDate = addDays(weekRange.start, dayindex);
@@ -205,8 +206,8 @@ export default function TeacherTimetable() {
                     <td
                       key={dayindex}
                       style={{
-                        padding: 10,
-                        minWidth: 120,
+                        padding: 6,
+                        minWidth: 88,
                         background: isTodayCell ? 'var(--today-bg)' : 'var(--white)',
                         border: '1px solid var(--border)',
                         verticalAlign: 'top',
@@ -215,28 +216,29 @@ export default function TeacherTimetable() {
                       {cell ? (
                         <div
                           style={{
-                            background: 'var(--red-100)',
-                            borderRadius: 8,
-                            padding: 10,
+                            background: 'var(--timetable-red-light)',
+                            borderRadius: 6,
+                            padding: 6,
                             cursor: 'pointer',
                             position: 'relative',
+                            border: '1px solid var(--timetable-red-border)',
                           }}
                           onClick={() => handleCellClick(dayindex, period)}
                         >
-                          <div style={{ fontWeight: 700, marginBottom: 4 }}>{cell.subject}</div>
-                          <div style={{ fontSize: 12, color: 'var(--text-muted)', background: 'var(--yellow-400)', padding: '2px 6px', borderRadius: 4, display: 'inline-block' }}>
+                          <div style={{ fontWeight: 700, marginBottom: 2, fontSize: 12 }}>{cell.subject}</div>
+                          <div style={{ fontSize: 11, color: 'var(--text)', background: 'var(--yellow-400)', padding: '2px 4px', borderRadius: 4, display: 'inline-block' }}>
                             {cell.room}
                           </div>
                           <button
                             onClick={(e) => { e.stopPropagation(); handleDownloadXlsx(dayindex, period); }}
-                            style={{ position: 'absolute', top: 8, right: 8, padding: 4, border: 'none', background: 'transparent', cursor: 'pointer' }}
+                            style={{ position: 'absolute', top: 4, right: 4, padding: 2, border: 'none', background: 'transparent', cursor: 'pointer' }}
                             title="엑셀 다운로드"
                           >
-                            <FileSpreadsheet size={18} color="var(--accent)" />
+                            <FileSpreadsheet size={14} color="var(--accent)" />
                           </button>
                         </div>
                       ) : (
-                        <span style={{ color: 'var(--text-muted)' }}>—</span>
+                        <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>—</span>
                       )}
                     </td>
                   );
@@ -245,6 +247,7 @@ export default function TeacherTimetable() {
             ))}
           </tbody>
         </table>
+      </div>
       </div>
 
       {modalCell && (

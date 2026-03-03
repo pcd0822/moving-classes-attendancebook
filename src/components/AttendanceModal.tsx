@@ -36,20 +36,25 @@ export default function AttendanceModal({ weekStart, cell, subjectInfo, attendan
     onSave(name, next, cur?.note ?? '');
   };
 
+  const handleSaveAll = () => {
+    students.forEach(s => {
+      const rec = recordMap.get(s.name);
+      onSave(s.name, rec?.status ?? '', rec?.note ?? '');
+    });
+  };
+
   return (
     <div
       style={{
-        position: 'fixed',
-        top: 0,
-        right: 0,
-        width: 400,
+        flex: '0 0 40%',
+        minWidth: 280,
         height: '100vh',
         background: 'var(--white)',
         boxShadow: '-4px 0 20px var(--shadow)',
-        zIndex: 1000,
         display: 'flex',
         flexDirection: 'column',
         overflow: 'hidden',
+        fontFamily: "'Open Sans', 'Malgun Gothic', sans-serif",
       }}
     >
       <div style={{ padding: 16, borderBottom: '1px solid var(--border)', flexShrink: 0 }}>
@@ -64,6 +69,24 @@ export default function AttendanceModal({ weekStart, cell, subjectInfo, attendan
             <X size={24} />
           </button>
         </div>
+        <button
+          type="button"
+          onClick={handleSaveAll}
+          style={{
+            marginTop: 12,
+            width: '100%',
+            padding: 12,
+            background: 'var(--accent)',
+            color: 'var(--white)',
+            border: 'none',
+            borderRadius: 8,
+            fontWeight: 600,
+            cursor: 'pointer',
+            fontSize: 14,
+          }}
+        >
+          출결 현황 저장하기
+        </button>
       </div>
       <div style={{ flex: 1, overflow: 'auto', padding: 16 }}>
         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
@@ -75,6 +98,9 @@ export default function AttendanceModal({ weekStart, cell, subjectInfo, attendan
             </tr>
           </thead>
           <tbody>
+            {students.length === 0 && (
+              <tr><td colSpan={3} style={{ padding: 16, color: 'var(--text-muted)', textAlign: 'center' }}>수강생 목록은 관리자 시트(과목출석부)에서 불러옵니다.</td></tr>
+            )}
             {students.map(s => {
               const rec = recordMap.get(s.name);
               return (
