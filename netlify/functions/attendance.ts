@@ -1,9 +1,36 @@
 import type { Handler, HandlerEvent, HandlerContext } from '@netlify/functions';
 import { google } from 'googleapis';
 
+/**
+ * 환경변수에서 줄바꿈이 공백으로 바뀌거나 \\n으로 들어오는 경우를 PEM 형식으로 복구.
+ * OpenSSL "DECODER routines::unsupported" 방지.
+ */
+function normalizePrivateKey(pem: string): string {
+  if (!pem || typeof pem !== 'string') return pem;
+  let key = pem
+    .replace(/^\uFEFF/, '')
+    .replace(/\\n/g, '\n')
+    .replace(/\r\n/g, '\n')
+    .replace(/\r/g, '\n')
+    .trim();
+  const begin = '-----BEGIN PRIVATE KEY-----';
+  const end = '-----END PRIVATE KEY-----';
+  key = key.replace(/\s*-----BEGIN PRIVATE KEY-----\s*/, begin + '\n').replace(/\s*-----END PRIVATE KEY-----\s*/, '\n' + end + '\n');
+  const beginIdx = key.indexOf(begin);
+  const endIdx = key.indexOf(end);
+  if (beginIdx !== -1 && endIdx > beginIdx) {
+    const middle = key.slice(beginIdx + begin.length, endIdx).replace(/\s/g, '');
+    const lines: string[] = [];
+    for (let i = 0; i < middle.length; i += 64) lines.push(middle.slice(i, i + 64));
+    key = begin + '\n' + lines.join('\n') + '\n' + end + '\n';
+  }
+  if (!key.endsWith('\n')) key += '\n';
+  return key;
+}
+
 function normalizeServiceAccountKey(key: Record<string, unknown>): Record<string, unknown> {
   if (key.private_key && typeof key.private_key === 'string') {
-    key.private_key = key.private_key.replace(/\\n/g, '\n');
+    key.private_key = normalizePrivateKey(key.private_key);
   }
   return key;
 }
