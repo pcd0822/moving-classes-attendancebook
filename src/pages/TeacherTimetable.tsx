@@ -65,11 +65,15 @@ export default function TeacherTimetable() {
   }, [teacherName, spreadsheetId, nav]);
 
   const myTimetable = useMemo(() => {
-    const norm = (s: string) => (s || '').trim().toLowerCase().replace(/\s+/g, ' ');
+    const norm = (s: string) =>
+      (s || '')
+        .trim()
+        .toLowerCase()
+        .replace(/\s+/g, ' ')
+        .replace(/\u00a0/g, ' ')
+        .replace(/\s/g, '');
     const normalized = norm(teacherName ?? '');
-    const my = timetableRows.filter(
-      r => norm(r.teachername) === normalized
-    );
+    const my = timetableRows.filter(r => norm(r.teachername) === normalized);
     const grid: (TimetableCell | null)[][] = Array(7).fill(null).map(() => Array(5).fill(null));
     for (const r of my) {
       if (r.period >= 1 && r.period <= 7 && r.dayindex >= 0 && r.dayindex <= 4) {
@@ -159,7 +163,23 @@ export default function TeacherTimetable() {
           </button>
         </div>
       </div>
-      <p style={{ color: 'var(--text-muted)', marginBottom: 16 }}>{formatWeekLabel(weekRange.start)}</p>
+      <p style={{ color: 'var(--text-muted)', marginBottom: 16 }}>
+        {formatWeekLabel(weekRange.start)}
+        {timetableRows.length >= 0 && (
+          <span style={{ marginLeft: 12, fontSize: 13 }}>· 교사시간표 시트 {timetableRows.length}건 조회됨</span>
+        )}
+      </p>
+
+      {timetableRows.length > 0 && myTimetable.flat().every(c => c === null) && (
+        <p style={{ marginBottom: 16, padding: 12, background: 'var(--red-100)', borderRadius: 8, color: 'var(--text)' }}>
+          검색한 이름 &quot;{teacherName}&quot;과(와) 일치하는 시간표가 없습니다. 교사별 시간표 엑셀의 teachername 칸에 입력된 이름과 띄어쓰기·철자가 같은지 확인해 보세요.
+        </p>
+      )}
+      {timetableRows.length === 0 && (
+        <p style={{ marginBottom: 16, padding: 12, background: 'var(--red-100)', borderRadius: 8, color: 'var(--text)' }}>
+          교사별 시간표 데이터가 없습니다. 관리자 페이지에서 교사별 시간표 엑셀을 업로드한 뒤 DB 제작을 실행해 주세요.
+        </p>
+      )}
 
       <div style={{ overflowX: 'auto' }}>
         <table style={{ width: '100%', minWidth: 600, borderCollapse: 'collapse', background: 'var(--white)', borderRadius: 12, overflow: 'hidden', boxShadow: '0 2px 12px var(--shadow)' }}>
@@ -167,7 +187,7 @@ export default function TeacherTimetable() {
             <tr>
               <th style={{ padding: 12, background: 'var(--red-200)', width: 64 }}>교시</th>
               {weekRange.labels.map((l, i) => (
-                <th key={i} style={{ padding: 12, background: isToday(l.date) ? 'var(--today-bg)' : 'var(--pastel-pink)' }}>
+                <th key={i} style={{ padding: 12, background: isToday(l.date) ? 'var(--today-bg)' : 'var(--red-200)' }}>
                   {l.label}
                 </th>
               ))}

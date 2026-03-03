@@ -161,16 +161,31 @@ export const handler: Handler = async (event: HandlerEvent, _context: HandlerCon
         range: `'${SHEET_TIMETABLE}'!A:E`,
       }).catch(() => ({ data: { values: [] } }));
       const values = (res.data.values || []) as (string | number)[][];
-      const [header, ...data] = values;
-      const firstHeader = header && String(header[0] ?? '').toLowerCase().replace(/\s/g, '');
-      if (!header || firstHeader !== 'teachername') return { statusCode: 200, headers, body: JSON.stringify({ rows: [] }) };
-      const rows = data.map(row => ({
-        teachername: String(row[0] ?? '').trim(),
-        dayindex: Number(row[1]) || 0,
-        period: Number(row[2]) || 0,
-        subject: String(row[3] ?? '').trim(),
-        room: String(row[4] ?? '').trim(),
-      }));
+      if (!values.length) return { statusCode: 200, headers, body: JSON.stringify({ rows: [] }) };
+      const normHeader = (v: unknown) => String(v ?? '').trim().toLowerCase().replace(/\s/g, '');
+      let headerRowIndex = -1;
+      for (let i = 0; i < Math.min(values.length, 50); i++) {
+        const row = values[i];
+        if (!row || !Array.isArray(row)) continue;
+        const a1 = normHeader(row[0]);
+        if (a1 === 'teachername') {
+          headerRowIndex = i;
+          break;
+        }
+      }
+      if (headerRowIndex < 0) return { statusCode: 200, headers, body: JSON.stringify({ rows: [] }) };
+      const header = values[headerRowIndex];
+      const data = values.slice(headerRowIndex + 1);
+      if (!header || normHeader(header[0]) !== 'teachername') return { statusCode: 200, headers, body: JSON.stringify({ rows: [] }) };
+      const rows = data
+        .filter(row => row && (row[0] != null && String(row[0]).trim() !== ''))
+        .map(row => ({
+          teachername: String(row[0] ?? '').trim(),
+          dayindex: Number(row[1]) || 0,
+          period: Number(row[2]) || 0,
+          subject: String(row[3] ?? '').trim(),
+          room: String(row[4] ?? '').trim(),
+        }));
       return { statusCode: 200, headers, body: JSON.stringify({ rows }) };
     }
 
