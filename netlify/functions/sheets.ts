@@ -145,15 +145,28 @@ export const handler: Handler = async (event: HandlerEvent, _context: HandlerCon
       const values = (res.data.values || []) as string[][];
       const [header, ...data] = values;
       if (!header || header[0] !== 'time') return { statusCode: 200, headers, body: JSON.stringify({ rows: [] }) };
-      const rows = data.map(row => ({
-        time: row[0],
-        subject: row[1],
-        subjectKey: row[2],
-        room: row[3],
-        teachers: (row[4] || '').split(',').map(t => t.trim()).filter(Boolean),
-        count: Number(row[5]) || 0,
-        students: (() => { try { return JSON.parse(row[6] || '[]'); } catch { return []; } })(),
-      }));
+      const rows = data.map(row => {
+        let students: Array<{ name: string }> = [];
+        try {
+          const raw = JSON.parse(row[6] || '[]');
+          if (Array.isArray(raw)) {
+            students = raw
+              .map((s: unknown) => (typeof s === 'object' && s !== null && 'name' in s)
+                ? { name: String((s as { name: unknown }).name).trim() }
+                : null)
+              .filter((x): x is { name: string } => x !== null && x.name !== '');
+          }
+        } catch { /* ignore */ }
+        return {
+          time: row[0],
+          subject: row[1],
+          subjectKey: (row[2] ?? '').toString().trim(),
+          room: row[3],
+          teachers: (row[4] || '').split(',').map((t: string) => t.trim()).filter(Boolean),
+          count: Number(row[5]) || 0,
+          students,
+        };
+      });
       return { statusCode: 200, headers, body: JSON.stringify({ rows }) };
     }
 

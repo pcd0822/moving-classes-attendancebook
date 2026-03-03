@@ -13,10 +13,10 @@
   --text: #1f2937;
   --text-muted: #6b7280;
   --border: #e5e7eb;
-  /* 시간표: 흰 배경 + 진한 빨강, 오늘은 불투명 노랑 */
-  --timetable-red: #b91c1c;
-  --timetable-red-light: #fecaca;
-  --timetable-red-border: #fca5a5;
+  /* 시간표: 흰 배경 + 연한 빨강 헤더, 오늘은 불투명 노랑 */
+  --timetable-red: #e57373;
+  --timetable-red-light: #ffebee;
+  --timetable-red-border: #fecaca;
   --today-bg: #fef08a;
   --shadow: rgba(0, 0, 0, 0.08);
   --accent: var(--yellow-500);

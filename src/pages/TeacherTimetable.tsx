@@ -13,6 +13,25 @@ import ExportClassAttendance from '@/components/ExportClassAttendance';
 const DAY_LABELS = ['월', '화', '수', '목', '금'];
 const PERIOD_LABELS = ['1교시', '2교시', '3교시', '4교시', '5교시', '6교시', '7교시'];
 
+/** subjectKey/과목명 정규화 후 매칭 (공백·대소문자 차이 보정) */
+function normKey(s: string): string {
+  return (s ?? '').trim().toLowerCase().replace(/\s+/g, '').replace(/\u00a0/g, '');
+}
+function findSubject(
+  subjects: Array<{ subjectKey: string; subject: string; teachers: string[]; students: Array<{ name: string }> }>,
+  subjectKey: string,
+  subjectName?: string
+) {
+  const n = normKey(subjectKey);
+  const byKey = subjects.find(s => normKey(s.subjectKey) === n);
+  if (byKey) return byKey;
+  if (subjectName) {
+    const nName = normKey(subjectName);
+    return subjects.find(s => normKey(s.subject) === nName || normKey(s.subjectKey) === nName);
+  }
+  return undefined;
+}
+
 export default function TeacherTimetable() {
   const nav = useNavigate();
   const teacherName = localStorage.getItem('moving_attendance_teacher_name');
@@ -77,7 +96,7 @@ export default function TeacherTimetable() {
     const grid: (TimetableCell | null)[][] = Array(7).fill(null).map(() => Array(5).fill(null));
     for (const r of my) {
       if (r.period >= 1 && r.period <= 7 && r.dayindex >= 0 && r.dayindex <= 4) {
-        const subj = subjects.find(s => s.subjectKey === r.subject);
+        const subj = findSubject(subjects, r.subject, r.subject);
         grid[r.period - 1][r.dayindex] = {
           subject: subj ? subj.subject : r.subject,
           room: r.room,
@@ -92,13 +111,14 @@ export default function TeacherTimetable() {
   const handleCellClick = (dayindex: number, period: number) => {
     const cell = myTimetable[period - 1]?.[dayindex];
     if (!cell) return;
+    const subj = findSubject(subjects, cell.subjectKey, cell.subject);
     setModalCell({
       dayindex,
       period,
       subjectKey: cell.subjectKey,
       subject: cell.subject,
       room: cell.room,
-      teachers: subjects.find(s => s.subjectKey === cell.subjectKey)?.teachers ?? [],
+      teachers: subj?.teachers ?? [],
     });
   };
 
@@ -183,12 +203,12 @@ export default function TeacherTimetable() {
       )}
 
       <div style={{ overflowX: 'auto' }}>
-        <table style={{ width: '100%', maxWidth: 520, minWidth: 380, borderCollapse: 'collapse', background: 'var(--white)', borderRadius: 10, overflow: 'hidden', boxShadow: '0 2px 8px var(--shadow)', fontSize: 13 }}>
+        <table style={{ width: '100%', maxWidth: 640, minWidth: 480, borderCollapse: 'collapse', background: 'var(--white)', borderRadius: 10, overflow: 'hidden', boxShadow: '0 2px 8px var(--shadow)', fontSize: 13 }}>
           <thead>
             <tr>
-              <th style={{ padding: 8, background: 'var(--timetable-red)', color: 'var(--white)', width: 52, fontSize: 12 }}>교시</th>
+              <th style={{ padding: 8, background: 'var(--timetable-red)', color: 'var(--text)', width: 52, fontSize: 12 }}>교시</th>
               {weekRange.labels.map((l, i) => (
-                <th key={i} style={{ padding: 8, background: isToday(l.date) ? 'var(--today-bg)' : 'var(--timetable-red)', color: isToday(l.date) ? 'var(--text)' : 'var(--white)', fontSize: 12 }}>
+                <th key={i} style={{ padding: 8, background: isToday(l.date) ? 'var(--today-bg)' : 'var(--timetable-red)', color: 'var(--text)', fontSize: 12 }}>
                   {l.label}
                 </th>
               ))}
@@ -206,8 +226,8 @@ export default function TeacherTimetable() {
                     <td
                       key={dayindex}
                       style={{
-                        padding: 6,
-                        minWidth: 88,
+                        padding: 8,
+                        minWidth: 100,
                         background: isTodayCell ? 'var(--today-bg)' : 'var(--white)',
                         border: '1px solid var(--border)',
                         verticalAlign: 'top',
@@ -254,7 +274,7 @@ export default function TeacherTimetable() {
         <AttendanceModal
           weekStart={weekRange.start}
           cell={modalCell}
-          subjectInfo={subjects.find(s => s.subjectKey === modalCell.subjectKey)}
+          subjectInfo={findSubject(subjects, modalCell.subjectKey, modalCell.subject)}
           attendanceRecords={attendanceRecords}
           onSave={handleSaveAttendance}
           onClose={() => setModalCell(null)}

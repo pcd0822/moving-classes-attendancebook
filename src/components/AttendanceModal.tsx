@@ -29,6 +29,7 @@ export default function AttendanceModal({ weekStart, cell, subjectInfo, attendan
   }, [attendanceRecords, date, cell.dayindex, cell.period, cell.subjectKey]);
 
   const students = subjectInfo?.students ?? [];
+  const teachersDisplay = (subjectInfo?.teachers ?? cell.teachers)?.filter(Boolean).join(', ') || '-';
 
   const toggleStatus = (name: string) => {
     const cur = recordMap.get(name);
@@ -63,7 +64,7 @@ export default function AttendanceModal({ weekStart, cell, subjectInfo, attendan
             <div style={{ fontWeight: 700, fontSize: 18, marginBottom: 4 }}>{cell.subject}</div>
             <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>수업 시간: {timeLabel}</div>
             <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>수업 장소: {cell.room}</div>
-            <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>담당 교사: {cell.teachers.join(', ') || '-'}</div>
+            <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>담당 교사: {teachersDisplay}</div>
           </div>
           <button onClick={onClose} style={{ padding: 4, border: 'none', background: 'transparent', cursor: 'pointer' }}>
             <X size={24} />
