@@ -67,15 +67,26 @@ export function parseAttendanceExcel(file: File): Promise<SubjectBlock[]> {
 
           const students: SubjectStudent[] = [];
           let r = blockStart + 6;
+          let nextBlockStart = r;
+
           while (r < maxRow) {
             if (isEmptyRow(sheet, r)) {
               const nextAlsoEmpty = r + 1 < maxRow && isEmptyRow(sheet, r + 1);
-              const nextLooksLikeBlockStart =
+              const e1 = sheet[XLSX.utils.encode_cell({ r: r + 1, c: 4 })]?.v;
+              const b1 = sheet[XLSX.utils.encode_cell({ r: r + 1, c: 1 })]?.v;
+              const nextHasBButNoE =
                 r + 1 < maxRow &&
                 !isEmptyRow(sheet, r + 1) &&
-                (sheet[XLSX.utils.encode_cell({ r: r + 1, c: 0 })]?.v == null || String(sheet[XLSX.utils.encode_cell({ r: r + 1, c: 0 })]?.v).trim() === '') &&
-                (sheet[XLSX.utils.encode_cell({ r: r + 1, c: 1 })]?.v != null && String(sheet[XLSX.utils.encode_cell({ r: r + 1, c: 1 })]?.v).trim() !== '');
-              if (nextAlsoEmpty || nextLooksLikeBlockStart) break;
+                (b1 != null && String(b1).trim() !== '') &&
+                (e1 == null || String(e1).trim() === '');
+              if (nextAlsoEmpty) {
+                nextBlockStart = r + 1;
+                break;
+              }
+              if (nextHasBButNoE) {
+                nextBlockStart = r + 1;
+                break;
+              }
               r++;
               continue;
             }
@@ -84,6 +95,12 @@ export function parseAttendanceExcel(file: File): Promise<SubjectBlock[]> {
             const c = sheet[XLSX.utils.encode_cell({ r, c: 2 })]?.v;
             const d = sheet[XLSX.utils.encode_cell({ r, c: 3 })]?.v;
             const e = sheet[XLSX.utils.encode_cell({ r, c: 4 })]?.v;
+            const eEmpty = e == null || String(e).trim() === '';
+            const bFilled = b != null && String(b).trim() !== '';
+            if (bFilled && eEmpty) {
+              nextBlockStart = r;
+              break;
+            }
             students.push({
               order: a != null ? Number(a) || 0 : 0,
               grade: b != null ? String(b).trim() : '',
@@ -93,8 +110,9 @@ export function parseAttendanceExcel(file: File): Promise<SubjectBlock[]> {
             });
             r++;
           }
+
           blocks.push({ subject, time, room, teachers, count, students });
-          row = r + 1;
+          row = nextBlockStart;
           while (row < maxRow && (isEmptyRow(sheet, row) || isMovingGroupRow(sheet, row))) row++;
         }
         resolve(blocks);
