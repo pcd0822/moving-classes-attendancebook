@@ -76,16 +76,18 @@ export const handler: Handler = async (event: HandlerEvent, _context: HandlerCon
     const id = spreadsheetId || process.env.SPREADSHEET_ID;
     if (!id) return { statusCode: 400, headers, body: JSON.stringify({ error: 'spreadsheetId required' }) };
     if (!teacherName) return { statusCode: 400, headers, body: JSON.stringify({ error: 'teacherName required' }) };
+    /** 출석 조회/저장은 관리자가 DB 제작한 시트에서 함. 환경변수 설정 시 교사 입력 URL 무시 */
+    const dbId = process.env.ADMIN_DB_SPREADSHEET_ID || id;
 
     const sheets = google.sheets({ version: 'v4', auth: getAuth() });
     const sheetTitle = sheetNameForTeacher(teacherName);
 
     const ensureSheet = async () => {
-      const meta = await sheets.spreadsheets.get({ spreadsheetId: id });
+      const meta = await sheets.spreadsheets.get({ spreadsheetId: dbId });
       const exists = meta.data.sheets?.some(s => s.properties?.title === sheetTitle);
       if (!exists) {
         await sheets.spreadsheets.batchUpdate({
-          spreadsheetId: id,
+          spreadsheetId: dbId,
           requestBody: {
             requests: [{ addSheet: { properties: { title: sheetTitle } } }],
           },
@@ -95,7 +97,7 @@ export const handler: Handler = async (event: HandlerEvent, _context: HandlerCon
 
     if (action === 'read') {
       const res = await sheets.spreadsheets.values.get({
-        spreadsheetId: id,
+        spreadsheetId: dbId,
         range: `'${sheetTitle}'!A:G`,
       }).catch(() => ({ data: { values: [] } }));
       const values = (res.data.values || []) as string[][];
@@ -118,20 +120,20 @@ export const handler: Handler = async (event: HandlerEvent, _context: HandlerCon
       await ensureSheet();
       const rows = records.map(r => [r.date, r.dayindex, r.period, r.subjectKey, r.studentName, r.status, r.note]);
       const res = await sheets.spreadsheets.values.get({
-        spreadsheetId: id,
+        spreadsheetId: dbId,
         range: `'${sheetTitle}'!A:G`,
       }).catch(() => ({ data: { values: [] } }));
       const values = (res.data.values || []) as string[][];
       if (values.length === 0) {
         await sheets.spreadsheets.values.update({
-          spreadsheetId: id,
+          spreadsheetId: dbId,
           range: `'${sheetTitle}'!A1`,
           valueInputOption: 'USER_ENTERED',
           requestBody: { values: [['date', 'dayindex', 'period', 'subjectKey', 'studentName', 'status', 'note'], ...rows] },
         });
       } else {
         await sheets.spreadsheets.values.append({
-          spreadsheetId: id,
+          spreadsheetId: dbId,
           range: `'${sheetTitle}'!A:G`,
           valueInputOption: 'USER_ENTERED',
           insertDataOption: 'INSERT_ROWS',
@@ -147,14 +149,14 @@ export const handler: Handler = async (event: HandlerEvent, _context: HandlerCon
       };
       await ensureSheet();
       const res = await sheets.spreadsheets.values.get({
-        spreadsheetId: id,
+        spreadsheetId: dbId,
         range: `'${sheetTitle}'!A:G`,
       }).catch(() => ({ data: { values: [] } }));
       let values = (res.data.values || []) as string[][];
       if (values.length === 0) {
         values = [['date', 'dayindex', 'period', 'subjectKey', 'studentName', 'status', 'note']];
         await sheets.spreadsheets.values.update({
-          spreadsheetId: id,
+          spreadsheetId: dbId,
           range: `'${sheetTitle}'!A1`,
           valueInputOption: 'USER_ENTERED',
           requestBody: { values },
@@ -171,14 +173,14 @@ export const handler: Handler = async (event: HandlerEvent, _context: HandlerCon
       }
       if (rowIndex > 0) {
         await sheets.spreadsheets.values.update({
-          spreadsheetId: id,
+          spreadsheetId: dbId,
           range: `'${sheetTitle}'!F${rowIndex}:G${rowIndex}`,
           valueInputOption: 'USER_ENTERED',
           requestBody: { values: [[status, note || '']] },
         });
       } else {
         await sheets.spreadsheets.values.append({
-          spreadsheetId: id,
+          spreadsheetId: dbId,
           range: `'${sheetTitle}'!A:G`,
           valueInputOption: 'USER_ENTERED',
           insertDataOption: 'INSERT_ROWS',

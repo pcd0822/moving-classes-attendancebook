@@ -79,6 +79,8 @@ export const handler: Handler = async (event: HandlerEvent, _context: HandlerCon
     const { action, spreadsheetId, ...rest } = body;
     const id = spreadsheetId || process.env.SPREADSHEET_ID;
     if (!id) return { statusCode: 400, headers, body: JSON.stringify({ error: 'spreadsheetId required' }) };
+    /** 교사별 시간표/과목 조회는 관리자가 DB 제작한 시트에서 함. 환경변수 설정 시 교사 입력 URL 무시 */
+    const dbId = process.env.ADMIN_DB_SPREADSHEET_ID || id;
 
     const sheets = getSheetsClient();
 
@@ -137,7 +139,7 @@ export const handler: Handler = async (event: HandlerEvent, _context: HandlerCon
 
     if (action === 'readSubjects') {
       const res = await sheets.spreadsheets.values.get({
-        spreadsheetId: id,
+        spreadsheetId: dbId,
         range: `'${SHEET_SUBJECTS}'!A:G`,
       }).catch(() => ({ data: { values: [] } }));
       const values = (res.data.values || []) as string[][];
@@ -157,7 +159,7 @@ export const handler: Handler = async (event: HandlerEvent, _context: HandlerCon
 
     if (action === 'readTimetable') {
       const res = await sheets.spreadsheets.values.get({
-        spreadsheetId: id,
+        spreadsheetId: dbId,
         range: `'${SHEET_TIMETABLE}'!A:E`,
       }).catch(() => ({ data: { values: [] } }));
       const values = (res.data.values || []) as (string | number)[][];
@@ -192,25 +194,25 @@ export const handler: Handler = async (event: HandlerEvent, _context: HandlerCon
     if (action === 'saveTeacherConfig') {
       const { uid, teacherName } = rest as { uid: string; teacherName: string };
       if (!uid || !teacherName) return { statusCode: 400, headers, body: JSON.stringify({ error: 'uid, teacherName required' }) };
-      const meta = await sheets.spreadsheets.get({ spreadsheetId: id });
+      const meta = await sheets.spreadsheets.get({ spreadsheetId: dbId });
       const has = meta.data.sheets?.some(s => s.properties?.title === SHEET_TEACHER_CONFIG);
       if (!has) {
         await sheets.spreadsheets.batchUpdate({
-          spreadsheetId: id,
+          spreadsheetId: dbId,
           requestBody: { requests: [{ addSheet: { properties: { title: SHEET_TEACHER_CONFIG } } }] },
         });
       }
       const res = await sheets.spreadsheets.values.get({
-        spreadsheetId: id,
+        spreadsheetId: dbId,
         range: `'${SHEET_TEACHER_CONFIG}'!A:C`,
       }).catch(() => ({ data: { values: [] } }));
       const values = (res.data.values || []) as string[][];
       const [h, ...dataRows] = values;
-      const newRow = [uid, teacherName, id];
+      const newRow = [uid, teacherName, dbId];
       const idx = dataRows.findIndex(r => r[0] === uid);
       if (idx >= 0) {
         await sheets.spreadsheets.values.update({
-          spreadsheetId: id,
+          spreadsheetId: dbId,
           range: `'${SHEET_TEACHER_CONFIG}'!A${idx + 2}:C${idx + 2}`,
           valueInputOption: 'USER_ENTERED',
           requestBody: { values: [newRow] },
@@ -218,14 +220,14 @@ export const handler: Handler = async (event: HandlerEvent, _context: HandlerCon
       } else {
         if (!h || h[0] !== 'uid') {
           await sheets.spreadsheets.values.update({
-            spreadsheetId: id,
+            spreadsheetId: dbId,
             range: `'${SHEET_TEACHER_CONFIG}'!A1:C1`,
             valueInputOption: 'USER_ENTERED',
             requestBody: { values: [['uid', 'teacherName', 'spreadsheetId']] },
           });
         }
         await sheets.spreadsheets.values.append({
-          spreadsheetId: id,
+          spreadsheetId: dbId,
           range: `'${SHEET_TEACHER_CONFIG}'!A:C`,
           valueInputOption: 'USER_ENTERED',
           insertDataOption: 'INSERT_ROWS',
@@ -239,13 +241,13 @@ export const handler: Handler = async (event: HandlerEvent, _context: HandlerCon
       const { uid } = rest as { uid: string };
       if (!uid) return { statusCode: 400, headers, body: JSON.stringify({ error: 'uid required' }) };
       const res = await sheets.spreadsheets.values.get({
-        spreadsheetId: id,
+        spreadsheetId: dbId,
         range: `'${SHEET_TEACHER_CONFIG}'!A:C`,
       });
       const values = (res.data.values || []) as string[][];
       const [, ...rows] = values;
       const row = rows.find(r => r[0] === uid);
-      return { statusCode: 200, headers, body: JSON.stringify({ teacherName: row?.[1] || null, spreadsheetId: row?.[2] || id }) };
+      return { statusCode: 200, headers, body: JSON.stringify({ teacherName: row?.[1] || null, spreadsheetId: row?.[2] || dbId }) };
     }
 
     return { statusCode: 400, headers, body: JSON.stringify({ error: 'Unknown action' }) };
