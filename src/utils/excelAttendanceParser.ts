@@ -41,7 +41,7 @@ export function parseAttendanceExcel(file: File): Promise<SubjectBlock[]> {
 
         const blocks: SubjectBlock[] = [];
         let row = 0;
-        const maxRow = 2000;
+        const maxRow = 50000;
 
         while (row < maxRow) {
           const bVal = sheet[XLSX.utils.encode_cell({ r: row, c: 1 })]?.v;
