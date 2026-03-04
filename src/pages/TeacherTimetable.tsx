@@ -50,6 +50,7 @@ export default function TeacherTimetable() {
   const [baselineCellRecords, setBaselineCellRecords] = useState<
     { date: string; dayindex: number; period: number; subjectKey: string; studentName: string; status: string; note: string }[] | null
   >(null);
+  const [showSavedModal, setShowSavedModal] = useState(false);
 
   const weekRange = useMemo(() => {
     const start = weekStart;
@@ -173,35 +174,55 @@ export default function TeacherTimetable() {
   };
 
   /** 현재 칸의 출결 현황을 스프레드시트에 저장 */
-  const handleSaveAttendanceAll = async () => {
+  const handleSaveAttendanceAll = async (opts?: { silent?: boolean }) => {
     if (!modalCell || !spreadsheetId || !teacherName) return;
     const date = dateToYMD(addDays(weekRange.start, modalCell.dayindex));
     const subj = findSubject(subjects, modalCell.subjectKey, modalCell.subject);
-    const students: SubjectStudent[] = subj?.students ?? [];
+    const students: SubjectStudent[] = [...(subj?.students ?? [])].sort((a, b) => {
+      const g = (a.grade || '').localeCompare(b.grade || '');
+      if (g !== 0) return g;
+      const c = (a.class || '').localeCompare(b.class || '');
+      if (c !== 0) return c;
+      const na = Number(a.number) || 0;
+      const nb = Number(b.number) || 0;
+      if (na !== nb) return na - nb;
+      return (a.name || '').localeCompare(b.name || '');
+    });
     const map = new Map<string, { status: string; note: string }>();
     for (const r of attendanceRecords) {
       if (r.date === date && r.dayindex === modalCell.dayindex && r.period === modalCell.period && r.subjectKey === modalCell.subjectKey) {
         map.set(r.studentName, { status: r.status, note: r.note });
       }
     }
-    await Promise.all(
-      students.map(s => {
-        const rec = map.get(s.name) ?? { status: '', note: '' };
-        return setAttendanceCell(spreadsheetId, teacherName, {
-          date,
-          dayindex: modalCell.dayindex,
-          period: modalCell.period,
-          subjectKey: modalCell.subjectKey,
-          grade: s.grade,
-          class: s.class,
-          number: s.number,
-          studentName: s.name,
-          status: rec.status,
-          note: rec.note,
-        });
-      })
-    );
-    window.alert('저장되었습니다.');
+    const newBaseline: {
+      date: string; dayindex: number; period: number; subjectKey: string; studentName: string; status: string; note: string;
+    }[] = [];
+    for (const s of students) {
+      const rec = map.get(s.name) ?? { status: '', note: '' };
+      await setAttendanceCell(spreadsheetId, teacherName, {
+        date,
+        dayindex: modalCell.dayindex,
+        period: modalCell.period,
+        subjectKey: modalCell.subjectKey,
+        grade: s.grade,
+        class: s.class,
+        number: s.number,
+        studentName: s.name,
+        status: rec.status,
+        note: rec.note,
+      });
+      newBaseline.push({
+        date,
+        dayindex: modalCell.dayindex,
+        period: modalCell.period,
+        subjectKey: modalCell.subjectKey,
+        studentName: s.name,
+        status: rec.status,
+        note: rec.note,
+      });
+    }
+    setBaselineCellRecords(newBaseline);
+    if (!opts?.silent) setShowSavedModal(true);
     setHasUnsaved(false);
   };
 
@@ -355,7 +376,7 @@ export default function TeacherTimetable() {
           subjectInfo={findSubject(subjects, modalCell.subjectKey, modalCell.subject)}
           attendanceRecords={attendanceRecords}
           onChange={handleAttendanceChange}
-          onSave={handleSaveAttendanceAll}
+          onSave={() => handleSaveAttendanceAll()}
           onReset={handleResetAttendance}
           onClose={() => setModalCell(null)}
         />
@@ -368,6 +389,59 @@ export default function TeacherTimetable() {
           attendanceRecords={attendanceRecords}
           onClose={() => setExportOpen(false)}
         />
+      )}
+
+      {showSavedModal && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0,0,0,0.35)',
+            zIndex: 1600,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          <div
+            style={{
+              background: 'var(--white)',
+              padding: 24,
+              borderRadius: 16,
+              boxShadow: '0 10px 30px var(--shadow)',
+              width: 320,
+              textAlign: 'center',
+            }}
+          >
+            <div style={{ marginBottom: 12 }}>
+              <img
+                src="/assets/attendance-saved.png"
+                alt="saved"
+                style={{ width: 72, height: 72, objectFit: 'contain' }}
+              />
+            </div>
+            <p style={{ margin: '0 0 4px', fontWeight: 600 }}>저장되었습니다</p>
+            <p style={{ margin: 0, fontSize: 13, color: 'var(--text-muted)' }}>연동된 스프레드시트에 출결 데이터가 반영되었어요.</p>
+            <div style={{ marginTop: 18, display: 'flex', justifyContent: 'center' }}>
+              <button
+                type="button"
+                onClick={() => setShowSavedModal(false)}
+                style={{
+                  padding: '8px 18px',
+                  borderRadius: 999,
+                  border: 'none',
+                  background: 'var(--accent)',
+                  color: 'var(--white)',
+                  fontSize: 14,
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                }}
+              >
+                확인
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {showUnsavedConfirm && (
@@ -398,7 +472,7 @@ export default function TeacherTimetable() {
               <button
                 type="button"
                 onClick={async () => {
-                  await handleSaveAttendanceAll();
+                  await handleSaveAttendanceAll({ silent: true });
                   setShowUnsavedConfirm(false);
                   const target = pendingCell;
                   setBaselineCellRecords(null);

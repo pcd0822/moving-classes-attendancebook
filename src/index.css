@@ -52,6 +52,10 @@ input, select, textarea {
   font-family: 'Open Sans', inherit;
 }
 
+input::placeholder, textarea::placeholder {
+  color: var(--text-muted);
+}
+
 a {
   color: var(--red-600);
   text-decoration: none;

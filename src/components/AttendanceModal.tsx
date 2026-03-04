@@ -142,7 +142,7 @@ export default function AttendanceModal({ weekStart, cell, subjectInfo, attendan
                   onMouseEnter={() => setHoverIndex(idx)}
                   onMouseLeave={() => setHoverIndex(null)}
                 >
-                  <td style={{ padding: 6, textAlign: 'center', fontSize: 12, color: 'var(--text-muted)' }}>{s.order}</td>
+                  <td style={{ padding: 6, textAlign: 'center', fontSize: 12, color: '#d1d5db' }}>{s.order}</td>
                   <td style={{ padding: 6, textAlign: 'center', fontSize: 12 }}>{s.grade}</td>
                   <td style={{ padding: 6, textAlign: 'center', fontSize: 12 }}>{s.class}</td>
                   <td style={{ padding: 6, textAlign: 'center', fontSize: 12 }}>{s.number}</td>
@@ -167,12 +167,12 @@ export default function AttendanceModal({ weekStart, cell, subjectInfo, attendan
                   <td style={{ padding: 4, verticalAlign: 'middle' }}>
                     <input
                       type="text"
-                      defaultValue={rec?.note}
-                      onBlur={(e) => {
-                        const v = e.target.value.trim();
-                        if (v !== (rec?.note ?? '')) onChange(s.name, rec?.status ?? '', v);
+                      value={rec?.note ?? ''}
+                      onChange={(e) => {
+                        const v = e.target.value;
+                        onChange(s.name, rec?.status ?? '', v);
                       }}
-                      placeholder="비고"
+                      placeholder="메모를 입력하세요"
                       style={{ width: '100%', height: 30, padding: '4px 6px', border: '1px solid var(--border)', borderRadius: 6, fontSize: 12 }}
                     />
                   </td>
