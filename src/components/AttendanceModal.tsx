@@ -61,7 +61,7 @@ export default function AttendanceModal({ weekStart, cell, subjectInfo, attendan
         flexDirection: 'column',
         overflow: 'hidden',
         fontFamily: "'Open Sans', 'Malgun Gothic', sans-serif",
-        animation: 'slideInRight 0.45s ease-out',
+        animation: 'slideInRight 0.75s ease-out',
       }}
     >
       <div style={{ padding: 16, borderBottom: '1px solid var(--border)', flexShrink: 0 }}>
@@ -113,16 +113,16 @@ export default function AttendanceModal({ weekStart, cell, subjectInfo, attendan
         </div>
       </div>
       <div style={{ flex: 1, overflow: 'auto', padding: 16 }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed' }}>
           <thead>
             <tr>
-              <th style={{ textAlign: 'center', padding: 8, borderBottom: '1px solid var(--border)', width: 40, whiteSpace: 'nowrap', color: 'var(--text-muted)' }}>연번</th>
-              <th style={{ textAlign: 'left', padding: 8, borderBottom: '1px solid var(--border)' }}>수강생 이름</th>
-              <th style={{ textAlign: 'center', padding: 8, borderBottom: '1px solid var(--border)', width: 88 }}>출결현황</th>
-              <th style={{ textAlign: 'center', padding: 8, borderBottom: '1px solid var(--border)', width: 48 }}>학년</th>
-              <th style={{ textAlign: 'center', padding: 8, borderBottom: '1px solid var(--border)', width: 48 }}>반</th>
-              <th style={{ textAlign: 'center', padding: 8, borderBottom: '1px solid var(--border)', width: 56 }}>번호</th>
-              <th style={{ textAlign: 'left', padding: 8, borderBottom: '1px solid var(--border)', width: 180 }}>비고</th>
+              <th style={{ textAlign: 'center', padding: 8, borderBottom: '1px solid var(--border)', width: '10%', whiteSpace: 'nowrap', color: 'var(--text-muted)' }}>연번</th>
+              <th style={{ textAlign: 'center', padding: 8, borderBottom: '1px solid var(--border)', width: '10%' }}>학년</th>
+              <th style={{ textAlign: 'center', padding: 8, borderBottom: '1px solid var(--border)', width: '10%' }}>반</th>
+              <th style={{ textAlign: 'center', padding: 8, borderBottom: '1px solid var(--border)', width: '10%' }}>번호</th>
+              <th style={{ textAlign: 'left', padding: 8, borderBottom: '1px solid var(--border)', width: '15%' }}>수강생 이름</th>
+              <th style={{ textAlign: 'center', padding: 8, borderBottom: '1px solid var(--border)', width: '15%' }}>출결현황</th>
+              <th style={{ textAlign: 'left', padding: 8, borderBottom: '1px solid var(--border)', width: '30%' }}>비고</th>
             </tr>
           </thead>
           <tbody>
@@ -143,6 +143,9 @@ export default function AttendanceModal({ weekStart, cell, subjectInfo, attendan
                   onMouseLeave={() => setHoverIndex(null)}
                 >
                   <td style={{ padding: 6, textAlign: 'center', fontSize: 12, color: 'var(--text-muted)' }}>{s.order}</td>
+                  <td style={{ padding: 6, textAlign: 'center', fontSize: 12 }}>{s.grade}</td>
+                  <td style={{ padding: 6, textAlign: 'center', fontSize: 12 }}>{s.class}</td>
+                  <td style={{ padding: 6, textAlign: 'center', fontSize: 12 }}>{s.number}</td>
                   <td style={{ padding: 8 }}>{s.name}</td>
                   <td style={{ padding: 4, textAlign: 'center', verticalAlign: 'middle' }}>
                     <button
@@ -161,9 +164,6 @@ export default function AttendanceModal({ weekStart, cell, subjectInfo, attendan
                       {rec?.status || ''}
                     </button>
                   </td>
-                  <td style={{ padding: 6, textAlign: 'center', fontSize: 12 }}>{s.grade}</td>
-                  <td style={{ padding: 6, textAlign: 'center', fontSize: 12 }}>{s.class}</td>
-                  <td style={{ padding: 6, textAlign: 'center', fontSize: 12 }}>{s.number}</td>
                   <td style={{ padding: 4, verticalAlign: 'middle' }}>
                     <input
                       type="text"

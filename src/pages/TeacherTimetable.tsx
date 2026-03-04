@@ -47,6 +47,9 @@ export default function TeacherTimetable() {
   const [hasUnsaved, setHasUnsaved] = useState(false);
   const [pendingCell, setPendingCell] = useState<{ dayindex: number; period: number } | null>(null);
   const [showUnsavedConfirm, setShowUnsavedConfirm] = useState(false);
+  const [baselineCellRecords, setBaselineCellRecords] = useState<
+    { date: string; dayindex: number; period: number; subjectKey: string; studentName: string; status: string; note: string }[] | null
+  >(null);
 
   const weekRange = useMemo(() => {
     const start = weekStart;
@@ -125,6 +128,10 @@ export default function TeacherTimetable() {
     const cell = myTimetable[period - 1]?.[dayindex];
     if (!cell) return;
     const subj = findSubject(subjects, cell.subjectKey, cell.subject);
+    const date = dateToYMD(addDays(weekRange.start, dayindex));
+    const snapshot = attendanceRecords.filter(
+      r => r.date === date && r.dayindex === dayindex && r.period === period && r.subjectKey === cell.subjectKey
+    );
     setModalCell({
       dayindex,
       period,
@@ -133,6 +140,7 @@ export default function TeacherTimetable() {
       room: cell.room,
       teachers: subj?.teachers ?? [],
     });
+    setBaselineCellRecords(snapshot);
     setHasUnsaved(false);
   };
 
@@ -393,6 +401,7 @@ export default function TeacherTimetable() {
                   await handleSaveAttendanceAll();
                   setShowUnsavedConfirm(false);
                   const target = pendingCell;
+                  setBaselineCellRecords(null);
                   setPendingCell(null);
                   if (target) openModalForCell(target.dayindex, target.period);
                 }}
@@ -413,8 +422,18 @@ export default function TeacherTimetable() {
                 type="button"
                 onClick={() => {
                   setShowUnsavedConfirm(false);
+                  if (modalCell && baselineCellRecords) {
+                    const date = dateToYMD(addDays(weekRange.start, modalCell.dayindex));
+                    setAttendanceRecords(prev => {
+                      const rest = prev.filter(
+                        r => !(r.date === date && r.dayindex === modalCell.dayindex && r.period === modalCell.period && r.subjectKey === modalCell.subjectKey)
+                      );
+                      return [...rest, ...baselineCellRecords];
+                    });
+                  }
                   setHasUnsaved(false);
                   const target = pendingCell;
+                  setBaselineCellRecords(null);
                   setPendingCell(null);
                   if (target) openModalForCell(target.dayindex, target.period);
                 }}

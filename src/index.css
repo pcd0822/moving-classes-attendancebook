@@ -45,6 +45,7 @@ body {
 button {
   cursor: pointer;
   font-family: 'Open Sans', inherit;
+  transition: transform 0.08s ease-out;
 }
 
 input, select, textarea {
@@ -65,13 +66,21 @@ table, th, td, label, h1, h2, h3, p, span {
   font-family: 'Open Sans', 'Malgun Gothic', sans-serif;
 }
 
+button:active {
+  transform: scale(1.03);
+}
+
 @keyframes slideInRight {
   0% {
-    transform: translateX(72px);
+    transform: translateX(96px);
     opacity: 0;
   }
-  70% {
-    transform: translateX(-6px);
+  60% {
+    transform: translateX(-8px);
+    opacity: 1;
+  }
+  85% {
+    transform: translateX(3px);
     opacity: 1;
   }
   100% {
