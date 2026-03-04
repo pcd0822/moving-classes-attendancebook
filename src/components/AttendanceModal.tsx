@@ -54,9 +54,11 @@ export default function AttendanceModal({ weekStart, cell, subjectInfo, attendan
 
   return (
     <div
+      className="attendance-modal-panel"
       style={{
         flex: '0 0 50%',
         minWidth: 320,
+        maxWidth: '100vw',
         height: '100vh',
         background: 'var(--white)',
         boxShadow: '-4px 0 20px var(--shadow)',

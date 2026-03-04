@@ -30,16 +30,25 @@
   font-family: inherit;
 }
 
+html {
+  font-size: 16px;
+  -webkit-text-size-adjust: 100%;
+}
+
 body {
   margin: 0;
   font-family: 'Open Sans', 'Malgun Gothic', sans-serif;
   background: var(--bg-page);
   color: var(--text);
   min-height: 100vh;
+  width: 100%;
+  overflow-x: hidden;
 }
 
 #root {
   min-height: 100vh;
+  width: 100%;
+  max-width: 100vw;
 }
 
 button {
@@ -90,5 +99,39 @@ button:active {
   100% {
     transform: translateX(0);
     opacity: 1;
+  }
+}
+
+/* 반응형: 태블릿 이하 */
+@media (max-width: 1024px) {
+  html {
+    font-size: 15px;
+  }
+}
+
+@media (max-width: 768px) {
+  html {
+    font-size: 14px;
+  }
+}
+
+@media (max-width: 480px) {
+  html {
+    font-size: 13px;
+  }
+}
+
+/* 시간표 + 출결 모달: 좁은 화면에서 모달 전체 화면 */
+@media (max-width: 768px) {
+  .timetable-page.with-modal .timetable-panel {
+    flex: 0 0 0 !important;
+    min-width: 0 !important;
+    overflow: hidden;
+    padding: 0;
+  }
+  .timetable-page.with-modal .attendance-modal-panel {
+    flex: 1 1 100% !important;
+    min-width: 100% !important;
+    max-width: 100% !important;
   }
 }

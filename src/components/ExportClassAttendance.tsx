@@ -3,7 +3,7 @@ import { format, addDays } from 'date-fns';
 import { ko } from 'date-fns/locale';
 import { X, FileDown, FileText } from 'lucide-react';
 import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
+import html2canvas from 'html2canvas';
 import type { SubjectStudent } from '@/types';
 import { getStudentKey } from '@/utils/attendanceKey';
 
@@ -112,7 +112,7 @@ export default function ExportClassAttendance({ subjects, weekStart, attendanceR
     return { headers, rows, noteMap };
   }, [subj, datesInRange, attendanceRecords, subjectKey]);
 
-  const handleDownload = () => {
+  const handleDownload = async () => {
     if (!subj) return;
     if (formatType === 'csv') {
       const { headers, rows } = buildTableData;
@@ -124,26 +124,58 @@ export default function ExportClassAttendance({ subjects, weekStart, attendanceR
       a.download = `출석부_${subj.subject}_${startDate}_${endDate}.csv`;
       a.click();
       URL.revokeObjectURL(a.href);
-    } else {
-      const doc = new jsPDF({ orientation: 'landscape' });
-      doc.setFontSize(14);
-      doc.text(`${subj.subject} 출석부 (${startDate} ~ ${endDate})`, 14, 12);
-      doc.setFontSize(10);
-      doc.text(`수업 장소: ${subj.room}  |  담당 교사: ${subj.teachers.join(', ')}`, 14, 18);
-      autoTable(doc, {
-        head: [buildTableData.headers],
-        body: buildTableData.rows,
-        startY: 24,
-        margin: { left: 14 },
-        styles: { fontSize: 8 },
+      onClose();
+      return;
+    }
+
+    // PDF: 브라우저 폰트로 한글 테이블을 렌더링한 뒤 캡처해 PDF에 넣음
+    const esc = (s: string) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    const { headers, rows } = buildTableData;
+    const wrap = document.createElement('div');
+    wrap.setAttribute('data-pdf-capture', 'true');
+    wrap.style.cssText = 'position:fixed;left:-99999px;top:0;width:1100px;background:#fff;padding:14px;font-family:"Open Sans","Malgun Gothic",sans-serif;font-size:12px;color:#1f2937;';
+    wrap.innerHTML = `
+      <div style="margin-bottom:10px;font-size:14px;font-weight:700;">${esc(subj.subject)} 출석부 (${esc(startDate)} ~ ${esc(endDate)})</div>
+      <div style="margin-bottom:6px;font-size:10px;color:#6b7280;">수업 장소: ${esc(subj.room)}  |  담당 교사: ${esc(subj.teachers.join(', '))}</div>
+      <table style="width:100%;border-collapse:collapse;font-size:9px;">
+        <thead><tr>${headers.map(h => `<th style="border:1px solid #e5e7eb;padding:4px 6px;text-align:center;background:#fef2f2;">${esc(h)}</th>`).join('')}</tr></thead>
+        <tbody>${rows.map(row => `<tr>${row.map(c => `<td style="border:1px solid #e5e7eb;padding:3px 5px;">${esc(c)}</td>`).join('')}</tr>`).join('')}</tbody>
+      </table>
+    `;
+    document.body.appendChild(wrap);
+
+    try {
+      const canvas = await html2canvas(wrap, {
+        scale: 2,
+        useCORS: true,
+        logging: false,
+        backgroundColor: '#ffffff',
       });
+      document.body.removeChild(wrap);
+
+      const imgW = canvas.width;
+      const imgH = canvas.height;
+      const doc = new jsPDF({ orientation: 'landscape', unit: 'px' });
+      const pageW = doc.internal.pageSize.getWidth();
+      const pageH = doc.internal.pageSize.getHeight();
+      const margin = 20;
+      const maxW = pageW - margin * 2;
+      const maxH = pageH - margin * 2;
+      const scale = Math.min(maxW / imgW, maxH / imgH, 1);
+      const w = imgW * scale;
+      const h = imgH * scale;
+      doc.addImage(canvas.toDataURL('image/png'), 'PNG', margin, margin, w, h);
       doc.save(`출석부_${subj.subject}_${startDate}_${endDate}.pdf`);
+    } catch (e) {
+      document.body.removeChild(wrap);
+      console.error(e);
     }
     onClose();
   };
 
   return (
     <div
+      className="export-modal-overlay"
       style={{
         position: 'fixed',
         inset: 0,
@@ -152,17 +184,20 @@ export default function ExportClassAttendance({ subjects, weekStart, attendanceR
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        padding: 24,
+        padding: 'clamp(12px, 4vw, 24px)',
       }}
       onClick={onClose}
     >
       <div
+        className="export-modal-content"
         style={{
           background: 'var(--white)',
           borderRadius: 16,
-          padding: 24,
+          padding: 'clamp(16px, 4vw, 24px)',
           maxWidth: 440,
           width: '100%',
+          maxHeight: '90vh',
+          overflowY: 'auto',
           boxShadow: '0 8px 32px var(--shadow)',
         }}
         onClick={e => e.stopPropagation()}

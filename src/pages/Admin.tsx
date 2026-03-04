@@ -138,7 +138,7 @@ export default function Admin() {
   };
 
   return (
-    <div style={{ maxWidth: 560, margin: '0 auto', padding: 24 }}>
+    <div style={{ maxWidth: 560, width: '100%', margin: '0 auto', padding: 'clamp(16px, 5vw, 24px)', boxSizing: 'border-box' }}>
       <h1 style={{ marginBottom: 24 }}>관리자 페이지</h1>
       <p style={{ color: 'var(--text-muted)', marginBottom: 24 }}>
         구글 스프레드시트 주소를 입력하고, 출석부 또는 시간표 중 하나 이상 업로드 후 DB 제작을 실행하세요. 입력한 주소와 업로드한 데이터는 브라우저에 저장되어 다시 올리지 않아도 됩니다.

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Search, LogIn } from 'lucide-react';
-import { initFirebase, signInWithGoogle, onAuthStateChanged } from '@/lib/firebase';
+import { initFirebase, signInWithGoogle, onAuthStateChanged, getTeacherConfigFromFirestore, saveTeacherConfigToFirestore } from '@/lib/firebase';
 import { saveTeacherConfig, getTeacherConfig } from '@/api/sheets';
 
 function getSpreadsheetIdFromUrl(url: string): string {
@@ -28,6 +28,20 @@ export default function TeacherStart() {
     if (stored) setSpreadsheetUrl(stored);
   }, []);
 
+  /** 구글 로그인 후 Firestore에 저장된 시트 주소·이름 불러오기 (다른 기기에서도 동일) */
+  useEffect(() => {
+    if (!uid) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const config = await getTeacherConfigFromFirestore(uid);
+        if (!cancelled && config?.spreadsheetUrl) setSpreadsheetUrl(config.spreadsheetUrl);
+        if (!cancelled && config?.teacherName) setTeacherName(config.teacherName);
+      } catch (_) {}
+    })();
+    return () => { cancelled = true; };
+  }, [uid]);
+
   const handleStart = async () => {
     setError('');
     const id = getSpreadsheetIdFromUrl(spreadsheetUrl);
@@ -46,6 +60,7 @@ export default function TeacherStart() {
       localStorage.setItem('moving_attendance_spreadsheet_id', id);
       if (uid) {
         await saveTeacherConfig(id, uid, name);
+        await saveTeacherConfigToFirestore(uid, { spreadsheetUrl, teacherName: name });
       }
       localStorage.setItem('moving_attendance_teacher_name', name);
       nav('/timetable');
@@ -65,7 +80,8 @@ export default function TeacherStart() {
     }
   };
 
-  const loadSavedName = async () => {
+  /** 같은 기기에서 시트 주소만 바꾼 경우, 해당 시트에 저장된 이름 불러오기 (Firestore와 별개) */
+  const loadSavedNameFromSheet = async () => {
     const id = getSpreadsheetIdFromUrl(spreadsheetUrl) || localStorage.getItem('moving_attendance_spreadsheet_id');
     if (!id || !uid) return;
     try {
@@ -75,11 +91,11 @@ export default function TeacherStart() {
   };
 
   useEffect(() => {
-    if (uid && spreadsheetUrl) loadSavedName();
+    if (uid && spreadsheetUrl) loadSavedNameFromSheet();
   }, [uid, spreadsheetUrl]);
 
   return (
-    <div style={{ maxWidth: 480, margin: '0 auto', padding: 24 }}>
+    <div style={{ maxWidth: 480, width: '100%', margin: '0 auto', padding: 'clamp(16px, 5vw, 24px)', boxSizing: 'border-box' }}>
       <h1 style={{ marginBottom: 24, color: 'var(--text)' }}>출석부 시작</h1>
       <div style={{ marginBottom: 16 }}>
         <label style={{ display: 'block', marginBottom: 6, fontWeight: 600 }}>구글 스프레드시트 주소</label>

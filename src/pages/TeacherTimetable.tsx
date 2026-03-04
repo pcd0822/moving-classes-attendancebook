@@ -340,10 +340,10 @@ export default function TeacherTimetable() {
   if (error) return <div style={{ padding: 48, color: '#c62828' }}>{error}</div>;
 
   return (
-    <div style={{ display: 'flex', width: '100%', minHeight: '100vh', fontFamily: "'Open Sans', 'Malgun Gothic', sans-serif" }}>
-      <div style={{ flex: modalCell ? '0 0 50%' : 1, padding: 24, overflow: 'auto', transition: 'flex 0.2s', minWidth: 0 }}>
+    <div className={modalCell ? 'timetable-page with-modal' : 'timetable-page'} style={{ display: 'flex', width: '100%', minHeight: '100vh', maxWidth: '100vw', fontFamily: "'Open Sans', 'Malgun Gothic', sans-serif" }}>
+      <div className="timetable-panel" style={{ flex: modalCell ? '0 0 50%' : 1, padding: 'clamp(12px, 4vw, 24px)', overflow: 'auto', transition: 'flex 0.2s', minWidth: 0 }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12, marginBottom: 12 }}>
-        <h1 style={{ margin: 0, fontSize: 20 }}>{teacherName} 선생님 시간표</h1>
+        <h1 style={{ margin: 0, fontSize: 'clamp(1.1rem, 4vw, 1.25rem)' }}>{teacherName} 선생님 시간표</h1>
         <div style={{ display: 'flex', gap: 8 }}>
           <button
             onClick={() => setExportOpen(true)}
@@ -411,8 +411,8 @@ export default function TeacherTimetable() {
         </p>
       )}
 
-      <div style={{ overflowX: 'auto' }}>
-        <table style={{ width: '100%', maxWidth: 640, minWidth: 480, borderCollapse: 'collapse', background: 'var(--white)', borderRadius: 10, overflow: 'hidden', boxShadow: '0 2px 8px var(--shadow)', fontSize: 13 }}>
+      <div style={{ overflowX: 'auto', width: '100%', maxWidth: '100%' }}>
+        <table style={{ width: '100%', maxWidth: 640, minWidth: 320, borderCollapse: 'collapse', background: 'var(--white)', borderRadius: 10, overflow: 'hidden', boxShadow: '0 2px 8px var(--shadow)', fontSize: 'clamp(12px, 2.5vw, 13px)' }}>
           <thead>
             <tr>
               <th style={{ padding: 8, background: 'var(--timetable-red)', color: 'var(--text)', width: 52, fontSize: 12, textAlign: 'center' }}>교시</th>
@@ -425,8 +425,8 @@ export default function TeacherTimetable() {
           </thead>
           <tbody>
             {[1, 2, 3, 4, 5, 6, 7].map(period => (
-              <tr key={period} style={{ minHeight: 56 }}>
-                <td style={{ padding: 6, background: 'var(--timetable-red-light)', fontWeight: 600, fontSize: 12, textAlign: 'center', minHeight: 56, boxSizing: 'border-box' }}>{PERIOD_LABELS[period - 1]}</td>
+              <tr key={period} style={{ height: 64 }}>
+                <td style={{ padding: 6, background: 'var(--timetable-red-light)', fontWeight: 600, fontSize: 12, textAlign: 'center', height: 64, boxSizing: 'border-box' }}>{PERIOD_LABELS[period - 1]}</td>
                 {[0, 1, 2, 3, 4].map(dayindex => {
                   const cell = myTimetable[period - 1]?.[dayindex];
                   const dayDate = addDays(weekRange.start, dayindex);
@@ -438,7 +438,7 @@ export default function TeacherTimetable() {
                       style={{
                         padding: 8,
                         minWidth: 100,
-                        minHeight: 56,
+                        height: 64,
                         boxSizing: 'border-box',
                         background: isTodayCell ? 'var(--today-bg)' : 'var(--white)',
                         border: '1px solid var(--border)',

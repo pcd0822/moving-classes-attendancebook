@@ -16,7 +16,7 @@ export default function Guide() {
   };
 
   return (
-    <div style={{ maxWidth: 560, margin: '0 auto', padding: 24, minHeight: '100vh' }}>
+    <div style={{ maxWidth: 560, width: '100%', margin: '0 auto', padding: 'clamp(16px, 5vw, 24px)', minHeight: '100vh', boxSizing: 'border-box' }}>
       <div style={{ textAlign: 'center', marginBottom: 32 }}>
         <div style={{ fontSize: 48, marginBottom: 8 }}>📚</div>
         <h1 style={{ margin: 0, color: 'var(--text)', fontWeight: 700 }}>이동반 출석부</h1>
