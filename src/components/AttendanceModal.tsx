@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { addDays } from 'date-fns';
 import { X } from 'lucide-react';
 import { dateToYMD } from '@/utils/weekRange';
+import { getStudentKey } from '@/utils/attendanceKey';
 import type { SubjectStudent } from '@/types';
 
 const DAY_LABELS = ['월', '화', '수', '목', '금'];
@@ -10,17 +11,19 @@ type Props = {
   weekStart: Date;
   cell: { dayindex: number; period: number; subjectKey: string; subject: string; room: string; teachers: string[] };
   subjectInfo?: { students: SubjectStudent[]; teachers: string[] };
-  attendanceRecords: Array<{ date: string; dayindex: number; period: number; subjectKey: string; studentName: string; status: string; note: string }>;
-  /** 개별 학생의 출결/비고 변경 (로컬 상태만 업데이트) */
-  onChange: (studentName: string, status: string, note: string) => void;
+  attendanceRecords: Array<{ date: string; dayindex: number; period: number; subjectKey: string; studentName: string; status: string; note: string; grade?: string; class?: string; number?: string }>;
+  /** 개별 학생의 출결/비고 변경 (로컬 상태만 업데이트). 학번(학년|반|번호) 기준으로 학생 구분. */
+  onChange: (student: SubjectStudent, status: string, note: string) => void;
   /** 현재 칸의 출결 현황을 스프레드시트에 저장 */
   onSave: () => void;
   /** 현재 칸의 출결·비고 입력값 초기화 */
   onReset: () => void;
+  /** 스프레드시트에서 출결 데이터를 다시 불러오기 */
+  onReload: () => void;
   onClose: () => void;
 };
 
-export default function AttendanceModal({ weekStart, cell, subjectInfo, attendanceRecords, onChange, onSave, onReset, onClose }: Props) {
+export default function AttendanceModal({ weekStart, cell, subjectInfo, attendanceRecords, onChange, onSave, onReset, onReload, onClose }: Props) {
   const date = dateToYMD(addDays(weekStart, cell.dayindex));
   const timeLabel = `${DAY_LABELS[cell.dayindex]} ${cell.period}교시`;
 
@@ -28,7 +31,7 @@ export default function AttendanceModal({ weekStart, cell, subjectInfo, attendan
     const map = new Map<string, { status: string; note: string }>();
     for (const r of attendanceRecords) {
       if (r.date === date && r.dayindex === cell.dayindex && r.period === cell.period && r.subjectKey === cell.subjectKey) {
-        map.set(r.studentName, { status: r.status, note: r.note });
+        map.set(getStudentKey(r), { status: r.status, note: r.note });
       }
     }
     return map;
@@ -39,10 +42,10 @@ export default function AttendanceModal({ weekStart, cell, subjectInfo, attendan
 
   const [hoverIndex, setHoverIndex] = useState<number | null>(null);
 
-  const toggleStatus = (name: string) => {
-    const cur = recordMap.get(name);
+  const toggleStatus = (student: SubjectStudent) => {
+    const cur = recordMap.get(getStudentKey(student));
     const next = cur?.status === '/' ? '' : '/';
-    onChange(name, next, cur?.note ?? '');
+    onChange(student, next, cur?.note ?? '');
   };
 
   const handleSaveAll = () => {
@@ -110,6 +113,22 @@ export default function AttendanceModal({ weekStart, cell, subjectInfo, attendan
           >
             초기화
           </button>
+          <button
+            type="button"
+            onClick={onReload}
+            style={{
+              flex: 1,
+              padding: 10,
+              background: 'var(--white)',
+              color: 'var(--text-muted)',
+              border: '1px solid var(--border)',
+              borderRadius: 8,
+              fontSize: 13,
+              cursor: 'pointer',
+            }}
+          >
+            새로고침
+          </button>
         </div>
       </div>
       <div style={{ flex: 1, overflow: 'auto', padding: 16 }}>
@@ -130,10 +149,10 @@ export default function AttendanceModal({ weekStart, cell, subjectInfo, attendan
               <tr><td colSpan={7} style={{ padding: 16, color: 'var(--text-muted)', textAlign: 'center' }}>수강생 목록은 관리자 시트(과목출석부)에서 불러옵니다.</td></tr>
             )}
             {students.map((s, idx) => {
-              const rec = recordMap.get(s.name);
+              const rec = recordMap.get(getStudentKey(s));
               return (
                 <tr
-                  key={s.name}
+                  key={getStudentKey(s)}
                   style={{
                     borderBottom: '1px solid var(--border)',
                     background: hoverIndex === idx ? 'rgba(250, 204, 21, 0.18)' : 'transparent',
@@ -150,7 +169,7 @@ export default function AttendanceModal({ weekStart, cell, subjectInfo, attendan
                   <td style={{ padding: 4, textAlign: 'center', verticalAlign: 'middle' }}>
                     <button
                       type="button"
-                      onClick={() => toggleStatus(s.name)}
+                      onClick={() => toggleStatus(s)}
                       style={{
                         width: 56,
                         height: 30,
@@ -170,7 +189,7 @@ export default function AttendanceModal({ weekStart, cell, subjectInfo, attendan
                       value={rec?.note ?? ''}
                       onChange={(e) => {
                         const v = e.target.value;
-                        onChange(s.name, rec?.status ?? '', v);
+                        onChange(s, rec?.status ?? '', v);
                       }}
                       placeholder="메모를 입력하세요"
                       style={{ width: '100%', height: 30, padding: '4px 6px', border: '1px solid var(--border)', borderRadius: 6, fontSize: 12 }}

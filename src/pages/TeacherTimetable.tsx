@@ -7,6 +7,7 @@ import { getCurrentWeekRange, formatWeekLabel, isToday, dateToYMD } from '@/util
 import { readSubjects, readTimetable } from '@/api/sheets';
 import { readAttendance, setAttendanceCell } from '@/api/attendance';
 import type { TimetableCell, SubjectStudent } from '@/types';
+import { getStudentKey } from '@/utils/attendanceKey';
 import AttendanceModal from '@/components/AttendanceModal';
 import ExportClassAttendance from '@/components/ExportClassAttendance';
 
@@ -38,7 +39,7 @@ export default function TeacherTimetable() {
   const spreadsheetId = localStorage.getItem('moving_attendance_spreadsheet_id');
   const [subjects, setSubjects] = useState<Array<{ time: string; subject: string; subjectKey: string; room: string; teachers: string[]; students: SubjectStudent[] }>>([]);
   const [timetableRows, setTimetableRows] = useState<Array<{ teachername: string; dayindex: number; period: number; subject: string; room: string }>>([]);
-  const [attendanceRecords, setAttendanceRecords] = useState<Array<{ date: string; dayindex: number; period: number; subjectKey: string; studentName: string; status: string; note: string }>>([]);
+  const [attendanceRecords, setAttendanceRecords] = useState<Array<{ date: string; dayindex: number; period: number; subjectKey: string; studentName: string; status: string; note: string; grade?: string; class?: string; number?: string }>>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [weekStart, setWeekStart] = useState(() => getCurrentWeekRange().start);
@@ -48,9 +49,11 @@ export default function TeacherTimetable() {
   const [pendingCell, setPendingCell] = useState<{ dayindex: number; period: number } | null>(null);
   const [showUnsavedConfirm, setShowUnsavedConfirm] = useState(false);
   const [baselineCellRecords, setBaselineCellRecords] = useState<
-    { date: string; dayindex: number; period: number; subjectKey: string; studentName: string; status: string; note: string }[] | null
+    { date: string; dayindex: number; period: number; subjectKey: string; studentName: string; status: string; note: string; grade?: string; class?: string; number?: string }[] | null
   >(null);
   const [showSavedModal, setShowSavedModal] = useState(false);
+  const [showSavingModal, setShowSavingModal] = useState(false);
+  const [savingProgress, setSavingProgress] = useState(0);
 
   const weekRange = useMemo(() => {
     const start = weekStart;
@@ -89,6 +92,16 @@ export default function TeacherTimetable() {
       }
     })();
   }, [teacherName, spreadsheetId, nav]);
+
+  const reloadAttendance = async () => {
+    if (!spreadsheetId || !teacherName) return;
+    try {
+      const att = await readAttendance(spreadsheetId, teacherName);
+      setAttendanceRecords(att);
+    } catch {
+      // ignore
+    }
+  };
 
   const myTimetable = useMemo(() => {
     const norm = (s: string) =>
@@ -179,15 +192,17 @@ export default function TeacherTimetable() {
     openModalForCell(dayindex, period);
   };
 
-  /** 모달 내 출결/비고 변경 – 로컬 상태만 갱신 (실제 저장은 저장 버튼에서 한 번에 수행) */
-  const handleAttendanceChange = (studentName: string, status: string, note: string) => {
+  /** 모달 내 출결/비고 변경 – 로컬 상태만 갱신 (실제 저장은 저장 버튼에서 한 번에 수행). 학번(학년|반|번호) 기준으로 학생 구분. */
+  const handleAttendanceChange = (student: SubjectStudent, status: string, note: string) => {
     if (!modalCell) return;
     const date = dateToYMD(addDays(weekRange.start, modalCell.dayindex));
+    const key = getStudentKey(student);
     setAttendanceRecords(prev => {
-      const rest = prev.filter(
-        r => !(r.date === date && r.dayindex === modalCell.dayindex && r.period === modalCell.period && r.subjectKey === modalCell.subjectKey && r.studentName === studentName)
-      );
-      return [...rest, { date, dayindex: modalCell.dayindex, period: modalCell.period, subjectKey: modalCell.subjectKey, studentName, status, note }];
+      const rest = prev.filter(r => {
+        if (r.date !== date || r.dayindex !== modalCell.dayindex || r.period !== modalCell.period || r.subjectKey !== modalCell.subjectKey) return true;
+        return getStudentKey(r) !== key;
+      });
+      return [...rest, { date, dayindex: modalCell.dayindex, period: modalCell.period, subjectKey: modalCell.subjectKey, studentName: student.name, grade: student.grade, class: student.class, number: student.number, status, note }];
     });
     setHasUnsaved(true);
   };
@@ -195,6 +210,8 @@ export default function TeacherTimetable() {
   /** 현재 칸의 출결 현황을 스프레드시트에 저장 */
   const handleSaveAttendanceAll = async (opts?: { silent?: boolean }) => {
     if (!modalCell || !spreadsheetId || !teacherName) return;
+    setShowSavingModal(true);
+    setSavingProgress(0);
     const date = dateToYMD(addDays(weekRange.start, modalCell.dayindex));
     const subj = findSubject(subjects, modalCell.subjectKey, modalCell.subject);
     const students: SubjectStudent[] = [...(subj?.students ?? [])].sort((a, b) => {
@@ -210,14 +227,16 @@ export default function TeacherTimetable() {
     const map = new Map<string, { status: string; note: string }>();
     for (const r of attendanceRecords) {
       if (r.date === date && r.dayindex === modalCell.dayindex && r.period === modalCell.period && r.subjectKey === modalCell.subjectKey) {
-        map.set(r.studentName, { status: r.status, note: r.note });
+        map.set(getStudentKey(r), { status: r.status, note: r.note });
       }
     }
     const newBaseline: {
-      date: string; dayindex: number; period: number; subjectKey: string; studentName: string; status: string; note: string;
+      date: string; dayindex: number; period: number; subjectKey: string; studentName: string; status: string; note: string; grade?: string; class?: string; number?: string;
     }[] = [];
+    const total = students.length || 1;
+    let index = 0;
     for (const s of students) {
-      const rec = map.get(s.name) ?? { status: '', note: '' };
+      const rec = map.get(getStudentKey(s)) ?? { status: '', note: '' };
       await setAttendanceCell(spreadsheetId, teacherName, {
         date,
         dayindex: modalCell.dayindex,
@@ -236,13 +255,20 @@ export default function TeacherTimetable() {
         period: modalCell.period,
         subjectKey: modalCell.subjectKey,
         studentName: s.name,
+        grade: s.grade,
+        class: s.class,
+        number: s.number,
         status: rec.status,
         note: rec.note,
       });
+      index += 1;
+      setSavingProgress(Math.round((index / total) * 100));
     }
     setBaselineCellRecords(newBaseline);
     if (!opts?.silent) setShowSavedModal(true);
     setHasUnsaved(false);
+    await reloadAttendance();
+    setTimeout(() => setShowSavingModal(false), 300);
   };
 
   /** 현재 칸의 출결·비고 입력값을 모두 지움 (로컬 상태) */
@@ -265,8 +291,8 @@ export default function TeacherTimetable() {
     const records = attendanceRecords.filter(
       r => r.date === date && r.dayindex === dayindex && r.period === period && r.subjectKey === cell.subjectKey
     );
-    const map = new Map(records.map(r => [r.studentName, { status: r.status, note: r.note }]));
-    const rows = (subj?.students ?? []).map(s => [s.name, map.get(s.name)?.status ?? '', map.get(s.name)?.note ?? '']);
+    const map = new Map(records.map(r => [getStudentKey(r), { status: r.status, note: r.note }]));
+    const rows = (subj?.students ?? []).map(s => [s.name, map.get(getStudentKey(s))?.status ?? '', map.get(getStudentKey(s))?.note ?? '']);
     const XLSX = await import('xlsx');
     const ws = XLSX.utils.aoa_to_sheet([
       [cell.subject, '', ''],
@@ -331,8 +357,8 @@ export default function TeacherTimetable() {
           </thead>
           <tbody>
             {[1, 2, 3, 4, 5, 6, 7].map(period => (
-              <tr key={period}>
-                <td style={{ padding: 6, background: 'var(--timetable-red-light)', fontWeight: 600, fontSize: 12, textAlign: 'center' }}>{PERIOD_LABELS[period - 1]}</td>
+              <tr key={period} style={{ minHeight: 56 }}>
+                <td style={{ padding: 6, background: 'var(--timetable-red-light)', fontWeight: 600, fontSize: 12, textAlign: 'center', minHeight: 56, boxSizing: 'border-box' }}>{PERIOD_LABELS[period - 1]}</td>
                 {[0, 1, 2, 3, 4].map(dayindex => {
                   const cell = myTimetable[period - 1]?.[dayindex];
                   const dayDate = addDays(weekRange.start, dayindex);
@@ -344,6 +370,8 @@ export default function TeacherTimetable() {
                       style={{
                         padding: 8,
                         minWidth: 100,
+                        minHeight: 56,
+                        boxSizing: 'border-box',
                         background: isTodayCell ? 'var(--today-bg)' : 'var(--white)',
                         border: '1px solid var(--border)',
                         verticalAlign: 'top',
@@ -394,9 +422,10 @@ export default function TeacherTimetable() {
           cell={modalCell}
           subjectInfo={findSubject(subjects, modalCell.subjectKey, modalCell.subject)}
           attendanceRecords={attendanceRecords}
-          onChange={handleAttendanceChange}
+          onChange={(student, status, note) => handleAttendanceChange(student, status, note)}
           onSave={() => handleSaveAttendanceAll()}
           onReset={handleResetAttendance}
+          onReload={reloadAttendance}
           onClose={() => setModalCell(null)}
         />
       )}
@@ -408,6 +437,59 @@ export default function TeacherTimetable() {
           attendanceRecords={attendanceRecords}
           onClose={() => setExportOpen(false)}
         />
+      )}
+
+      {showSavingModal && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0,0,0,0.3)',
+            zIndex: 1550,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          <div
+            style={{
+              background: 'var(--white)',
+              padding: 20,
+              borderRadius: 16,
+              boxShadow: '0 8px 24px var(--shadow)',
+              width: 280,
+              textAlign: 'center',
+            }}
+          >
+            <div style={{ marginBottom: 10 }}>
+              <img
+                src="/assets/attendance-saving.png"
+                alt="saving"
+                style={{ width: 56, height: 56, objectFit: 'contain' }}
+              />
+            </div>
+            <p style={{ margin: '0 0 10px', fontSize: 14 }}>저장중입니다...</p>
+            <div
+              style={{
+                width: '100%',
+                height: 8,
+                borderRadius: 999,
+                background: '#f3f4f6',
+                overflow: 'hidden',
+              }}
+            >
+              <div
+                style={{
+                  width: `${savingProgress}%`,
+                  height: '100%',
+                  background: 'var(--accent)',
+                  borderRadius: 999,
+                  transition: 'width 0.15s ease-out',
+                }}
+              />
+            </div>
+          </div>
+        </div>
       )}
 
       {showSavedModal && (

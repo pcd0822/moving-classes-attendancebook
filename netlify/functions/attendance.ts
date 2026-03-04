@@ -105,6 +105,9 @@ export const handler: Handler = async (event: HandlerEvent, _context: HandlerCon
       const idxDay = header.indexOf('dayindex');
       const idxPeriod = header.indexOf('period');
       const idxSubjectKey = header.indexOf('subjectKey');
+      const idxGrade = header.indexOf('grade');
+      const idxClass = header.indexOf('class');
+      const idxNumber = header.indexOf('number');
       const idxStudentName = header.indexOf('studentName');
       const idxStatus = header.indexOf('status');
       const idxNote = header.indexOf('note');
@@ -114,6 +117,9 @@ export const handler: Handler = async (event: HandlerEvent, _context: HandlerCon
         dayindex: Number(idxDay >= 0 ? row[idxDay] : row[1]) || 0,
         period: Number(idxPeriod >= 0 ? row[idxPeriod] : row[2]) || 0,
         subjectKey: idxSubjectKey >= 0 ? row[idxSubjectKey] : row[3],
+        grade: idxGrade >= 0 ? row[idxGrade] : undefined,
+        class: idxClass >= 0 ? row[idxClass] : undefined,
+        number: idxNumber >= 0 ? row[idxNumber] : undefined,
         studentName: idxStudentName >= 0 ? row[idxStudentName] : row[4],
         status: (idxStatus >= 0 ? row[idxStatus] : row[5]) || '',
         note: (idxNote >= 0 ? row[idxNote] : row[6]) || '',
@@ -181,6 +187,7 @@ export const handler: Handler = async (event: HandlerEvent, _context: HandlerCon
       const idxStatus = header.indexOf('status');
       const idxNote = header.indexOf('note');
 
+      const requestKey = [grade, klass, number].filter(Boolean).join('|') || studentName;
       let rowIndex = -1;
       for (let i = 0; i < dataRows.length; i++) {
         const r = dataRows[i];
@@ -188,8 +195,12 @@ export const handler: Handler = async (event: HandlerEvent, _context: HandlerCon
         const rowDay = Number(idxDay >= 0 ? r[idxDay] : r[1]);
         const rowPeriod = Number(idxPeriod >= 0 ? r[idxPeriod] : r[2]);
         const rowSubjectKey = idxSubjectKey >= 0 ? r[idxSubjectKey] : r[3];
+        const rowGrade = idxGrade >= 0 ? r[idxGrade] : '';
+        const rowClass = idxClass >= 0 ? r[idxClass] : '';
+        const rowNumber = idxNumber >= 0 ? r[idxNumber] : '';
         const rowStudentName = idxStudentName >= 0 ? r[idxStudentName] : r[4];
-        if (rowDate === date && rowDay === dayindex && rowPeriod === period && rowSubjectKey === subjectKey && rowStudentName === studentName) {
+        const rowKey = [rowGrade, rowClass, rowNumber].filter(Boolean).join('|') || rowStudentName;
+        if (rowDate === date && rowDay === dayindex && rowPeriod === period && rowSubjectKey === subjectKey && rowKey === requestKey) {
           rowIndex = i + 2;
           break;
         }

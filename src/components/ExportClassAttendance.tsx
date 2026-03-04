@@ -5,6 +5,7 @@ import { X, FileDown, FileText } from 'lucide-react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import type { SubjectStudent } from '@/types';
+import { getStudentKey } from '@/utils/attendanceKey';
 
 type SubjectRow = {
   time: string;
@@ -18,7 +19,7 @@ type SubjectRow = {
 type Props = {
   subjects: SubjectRow[];
   weekStart: Date;
-  attendanceRecords: Array<{ date: string; dayindex: number; period: number; subjectKey: string; studentName: string; status: string; note: string }>;
+  attendanceRecords: Array<{ date: string; dayindex: number; period: number; subjectKey: string; studentName: string; status: string; note: string; grade?: string; class?: string; number?: string }>;
   onClose: () => void;
 };
 
@@ -48,7 +49,15 @@ export default function ExportClassAttendance({ subjects, weekStart, attendanceR
 
   const buildTableData = useMemo(() => {
     if (!subj) return { headers: [] as string[], rows: [] as string[][], noteMap: new Map<string, string>() };
-    const headers = ['수강생 이름', ...datesInRange.map(x => format(x.date, 'M/d (EEE)', { locale: ko })), '비고'];
+    const headers = [
+      '연번',
+      '학년',
+      '반',
+      '번호',
+      '수강생 이름',
+      ...datesInRange.map(x => format(x.date, 'M/d (EEE)', { locale: ko })),
+      '비고',
+    ];
     const noteMap = new Map<string, string>();
     const statusMap = new Map<string, Map<string, string>>();
 
@@ -67,17 +76,27 @@ export default function ExportClassAttendance({ subjects, weekStart, attendanceR
       const dateStr = datesInRange.find(d => format(d.date, 'yyyy-MM-dd') === r.date && d.dayindex === r.dayindex);
       if (!dateStr) continue;
       const colKey = format(dateStr.date, 'M/d (EEE)', { locale: ko });
-      if (!statusMap.has(r.studentName)) statusMap.set(r.studentName, new Map());
-      statusMap.get(r.studentName)!.set(colKey, r.status);
-      if (r.note) noteMap.set(r.studentName, r.note);
+      const rKey = getStudentKey(r);
+      if (!statusMap.has(rKey)) statusMap.set(rKey, new Map());
+      statusMap.get(rKey)!.set(colKey, r.status);
+      if (r.note) noteMap.set(rKey, r.note);
     }
     const rows = subj.students.map(s => {
-      const note = noteMap.get(s.name) ?? '';
+      const sk = getStudentKey(s);
+      const note = noteMap.get(sk) ?? '';
       const cells = datesInRange.map(d => {
         const colKey = format(d.date, 'M/d (EEE)', { locale: ko });
-        return statusMap.get(s.name)?.get(colKey) ?? '';
+        return statusMap.get(sk)?.get(colKey) ?? '';
       });
-      return [s.name, ...cells, note];
+      return [
+        String(s.order ?? ''),
+        String(s.grade ?? ''),
+        String(s.class ?? ''),
+        String(s.number ?? ''),
+        s.name,
+        ...cells,
+        note,
+      ];
     });
     return { headers, rows, noteMap };
   }, [subj, datesInRange, attendanceRecords, subjectKey]);
