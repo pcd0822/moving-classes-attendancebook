@@ -224,6 +224,13 @@ export default function TeacherTimetable() {
     setHasUnsaved(true);
   };
 
+  /** 같은 칸(날짜·요일·교시·과목) 여부 */
+  const isSameCell = (
+    r: { date: string; dayindex: number; period: number; subjectKey: string },
+    cell: { dayindex: number; period: number; subjectKey: string },
+    cellDate: string
+  ) => r.date === cellDate && r.dayindex === cell.dayindex && r.period === cell.period && r.subjectKey === cell.subjectKey;
+
   /** 현재 칸의 출결 현황을 스프레드시트에 저장 */
   const handleSaveAttendanceAll = async (opts?: { silent?: boolean }) => {
     if (!modalCell || !spreadsheetId || !teacherName) return;
@@ -259,10 +266,27 @@ export default function TeacherTimetable() {
     }[] = [];
     const total = students.length || 1;
     let index = 0;
+    const notThisCell = (r: { date: string; dayindex: number; period: number; subjectKey: string }) =>
+      !isSameCell(r, cellToSave, date);
+
+    const setCellWithRetry = async (payload: Parameters<typeof setAttendanceCell>[2]) => {
+      let lastErr: unknown;
+      for (let attempt = 0; attempt < 3; attempt++) {
+        try {
+          await setAttendanceCell(spreadsheetId, teacherName, payload);
+          return;
+        } catch (e) {
+          lastErr = e;
+          if (attempt < 2) await new Promise(resolve => setTimeout(resolve, 400 * (attempt + 1)));
+        }
+      }
+      throw lastErr;
+    };
+
     try {
       for (const s of students) {
         const rec = map.get(getStudentKey(s)) ?? { status: '', note: '' };
-        await setAttendanceCell(spreadsheetId, teacherName, {
+        await setCellWithRetry({
           date,
           dayindex: cellToSave.dayindex,
           period: cellToSave.period,
@@ -289,10 +313,19 @@ export default function TeacherTimetable() {
         index += 1;
         setSavingProgress(Math.round((index / total) * 100));
       }
+
       setBaselineCellRecords(newBaseline);
-      if (!opts?.silent) setShowSavedModal(true);
       setHasUnsaved(false);
-      await reloadAttendance();
+      setAttendanceRecords(prev => [...prev.filter(notThisCell), ...newBaseline]);
+
+      if (!opts?.silent) setShowSavedModal(true);
+
+      try {
+        const att = await readAttendance(spreadsheetId, teacherName);
+        setAttendanceRecords(prev => [...att.filter(notThisCell), ...newBaseline]);
+      } catch {
+        // 시트 재조회 실패해도 방금 저장한 칸은 이미 반영됨
+      }
     } finally {
       savingModalTimeoutRef.current = setTimeout(() => {
         if (saveRunIdRef.current === thisRunId) setShowSavingModal(false);
