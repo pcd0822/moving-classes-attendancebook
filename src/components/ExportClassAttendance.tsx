@@ -51,8 +51,19 @@ export default function ExportClassAttendance({ subjects, weekStart, attendanceR
     const headers = ['수강생 이름', ...datesInRange.map(x => format(x.date, 'M/d (EEE)', { locale: ko })), '비고'];
     const noteMap = new Map<string, string>();
     const statusMap = new Map<string, Map<string, string>>();
+
+    const norm = (s: string) =>
+      (s || '')
+        .trim()
+        .toLowerCase()
+        .replace(/\s+/g, '')
+        .replace(/\u00a0/g, '');
+    const targetKeyNorm = norm(subjectKey);
+    const targetNameNorm = norm(subj.subject);
+
     for (const r of attendanceRecords) {
-      if (r.subjectKey !== subjectKey) continue;
+      const rKeyNorm = norm(r.subjectKey);
+      if (!(rKeyNorm === targetKeyNorm || rKeyNorm === targetNameNorm)) continue;
       const dateStr = datesInRange.find(d => format(d.date, 'yyyy-MM-dd') === r.date && d.dayindex === r.dayindex);
       if (!dateStr) continue;
       const colKey = format(dateStr.date, 'M/d (EEE)', { locale: ko });

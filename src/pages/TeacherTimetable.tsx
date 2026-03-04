@@ -140,13 +140,22 @@ export default function TeacherTimetable() {
     if (!cell) return;
     const subj = findSubject(subjects, cell.subjectKey, cell.subject);
     const date = dateToYMD(addDays(weekRange.start, dayindex));
-    const snapshot = attendanceRecords.filter(
-      r => r.date === date && r.dayindex === dayindex && r.period === period && r.subjectKey === cell.subjectKey
-    );
+    const snapshot = attendanceRecords.filter(r => {
+      if (r.date !== date || r.dayindex !== dayindex || r.period !== period) return false;
+      if (!subj) return r.subjectKey === cell.subjectKey;
+      const norm = (s: string) =>
+        (s || '')
+          .trim()
+          .toLowerCase()
+          .replace(/\s+/g, '')
+          .replace(/\u00a0/g, '');
+      const rKey = norm(r.subjectKey);
+      return rKey === norm(subj.subjectKey) || rKey === norm(subj.subject) || rKey === norm(cell.subjectKey);
+    });
     setModalCell({
       dayindex,
       period,
-      subjectKey: cell.subjectKey,
+      subjectKey: subj?.subjectKey ?? cell.subjectKey,
       subject: cell.subject,
       room: cell.room,
       teachers: subj?.teachers ?? [],
