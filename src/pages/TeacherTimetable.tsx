@@ -108,13 +108,14 @@ export default function TeacherTimetable() {
   const handlePrevWeek = () => shiftWeek(-1);
   const handleNextWeek = () => shiftWeek(1);
 
-  const reloadAttendance = async () => {
-    if (!spreadsheetId || !teacherName) return;
+  const reloadAttendance = async (): Promise<typeof attendanceRecords> => {
+    if (!spreadsheetId || !teacherName) return attendanceRecords;
     try {
       const att = await readAttendance(spreadsheetId, teacherName);
       setAttendanceRecords(att);
+      return att;
     } catch {
-      // ignore
+      return attendanceRecords;
     }
   };
 
@@ -163,12 +164,13 @@ export default function TeacherTimetable() {
     return set;
   }, [timetableRows, teacherName, subjects]);
 
-  const openModalForCell = (dayindex: number, period: number) => {
+  const openModalForCell = async (dayindex: number, period: number) => {
     const cell = myTimetable[period - 1]?.[dayindex];
     if (!cell) return;
+    const freshRecords = await reloadAttendance();
     const subj = findSubject(subjects, cell.subjectKey, cell.subject);
     const date = dateToYMD(addDays(weekRange.start, dayindex));
-    const snapshot = attendanceRecords.filter(r => {
+    const snapshot = freshRecords.filter(r => {
       if (r.date !== date || r.dayindex !== dayindex || r.period !== period) return false;
       if (!subj) return r.subjectKey === cell.subjectKey;
       const norm = (s: string) =>

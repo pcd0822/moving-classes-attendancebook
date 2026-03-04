@@ -61,7 +61,8 @@ function getAuth() {
 }
 
 function sheetNameForTeacher(teacherName: string): string {
-  const safe = teacherName.replace(/[\\/*?\[\]:]/g, '_').slice(0, 80);
+  const trimmed = (teacherName || '').trim().replace(/\s+/g, ' ');
+  const safe = trimmed.replace(/[\\/*?\[\]:]/g, '_').slice(0, 80);
   return `출결_${safe}`;
 }
 

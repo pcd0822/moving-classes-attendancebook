@@ -29,13 +29,18 @@ export default function AttendanceModal({ weekStart, cell, subjectInfo, attendan
 
   const recordMap = useMemo(() => {
     const map = new Map<string, { status: string; note: string }>();
+    const norm = (s: string) =>
+      (s || '').trim().toLowerCase().replace(/\s+/g, '').replace(/\u00a0/g, '');
+    const cellKeyNorm = norm(cell.subjectKey);
+    const cellSubjectNorm = norm(cell.subject);
     for (const r of attendanceRecords) {
-      if (r.date === date && r.dayindex === cell.dayindex && r.period === cell.period && r.subjectKey === cell.subjectKey) {
-        map.set(getStudentKey(r), { status: r.status, note: r.note });
-      }
+      if (r.date !== date || r.dayindex !== cell.dayindex || r.period !== cell.period) continue;
+      const rKeyNorm = norm(r.subjectKey);
+      if (rKeyNorm !== cellKeyNorm && rKeyNorm !== cellSubjectNorm) continue;
+      map.set(getStudentKey(r), { status: r.status, note: r.note });
     }
     return map;
-  }, [attendanceRecords, date, cell.dayindex, cell.period, cell.subjectKey]);
+  }, [attendanceRecords, date, cell.dayindex, cell.period, cell.subjectKey, cell.subject]);
 
   const students = subjectInfo?.students ?? [];
   const teachersDisplay = (subjectInfo?.teachers ?? cell.teachers)?.filter(Boolean).join(', ') || '-';
