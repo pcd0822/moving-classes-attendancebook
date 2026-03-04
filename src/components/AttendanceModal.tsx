@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { addDays } from 'date-fns';
 import { X } from 'lucide-react';
 import { dateToYMD } from '@/utils/weekRange';
@@ -37,6 +37,8 @@ export default function AttendanceModal({ weekStart, cell, subjectInfo, attendan
   const students = subjectInfo?.students ?? [];
   const teachersDisplay = (subjectInfo?.teachers ?? cell.teachers)?.filter(Boolean).join(', ') || '-';
 
+  const [hoverIndex, setHoverIndex] = useState<number | null>(null);
+
   const toggleStatus = (name: string) => {
     const cur = recordMap.get(name);
     const next = cur?.status === '/' ? '' : '/';
@@ -50,8 +52,8 @@ export default function AttendanceModal({ weekStart, cell, subjectInfo, attendan
   return (
     <div
       style={{
-        flex: '0 0 40%',
-        minWidth: 280,
+        flex: '0 0 50%',
+        minWidth: 320,
         height: '100vh',
         background: 'var(--white)',
         boxShadow: '-4px 0 20px var(--shadow)',
@@ -59,7 +61,7 @@ export default function AttendanceModal({ weekStart, cell, subjectInfo, attendan
         flexDirection: 'column',
         overflow: 'hidden',
         fontFamily: "'Open Sans', 'Malgun Gothic', sans-serif",
-        animation: 'slideInRight 0.25s ease-out',
+        animation: 'slideInRight 0.45s ease-out',
       }}
     >
       <div style={{ padding: 16, borderBottom: '1px solid var(--border)', flexShrink: 0 }}>
@@ -114,35 +116,41 @@ export default function AttendanceModal({ weekStart, cell, subjectInfo, attendan
         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
           <thead>
             <tr>
-              <th style={{ textAlign: 'center', padding: 8, borderBottom: '1px solid var(--border)', width: 40 }}>연번</th>
+              <th style={{ textAlign: 'center', padding: 8, borderBottom: '1px solid var(--border)', width: 40, whiteSpace: 'nowrap', color: 'var(--text-muted)' }}>연번</th>
+              <th style={{ textAlign: 'left', padding: 8, borderBottom: '1px solid var(--border)' }}>수강생 이름</th>
+              <th style={{ textAlign: 'center', padding: 8, borderBottom: '1px solid var(--border)', width: 88 }}>출결현황</th>
               <th style={{ textAlign: 'center', padding: 8, borderBottom: '1px solid var(--border)', width: 48 }}>학년</th>
               <th style={{ textAlign: 'center', padding: 8, borderBottom: '1px solid var(--border)', width: 48 }}>반</th>
               <th style={{ textAlign: 'center', padding: 8, borderBottom: '1px solid var(--border)', width: 56 }}>번호</th>
-              <th style={{ textAlign: 'left', padding: 8, borderBottom: '1px solid var(--border)' }}>수강생 이름</th>
-              <th style={{ textAlign: 'center', padding: 8, borderBottom: '1px solid var(--border)', width: 96 }}>출결현황</th>
-              <th style={{ textAlign: 'left', padding: 8, borderBottom: '1px solid var(--border)', width: 120 }}>비고</th>
+              <th style={{ textAlign: 'left', padding: 8, borderBottom: '1px solid var(--border)', width: 180 }}>비고</th>
             </tr>
           </thead>
           <tbody>
             {students.length === 0 && (
               <tr><td colSpan={7} style={{ padding: 16, color: 'var(--text-muted)', textAlign: 'center' }}>수강생 목록은 관리자 시트(과목출석부)에서 불러옵니다.</td></tr>
             )}
-            {students.map(s => {
+            {students.map((s, idx) => {
               const rec = recordMap.get(s.name);
               return (
-                <tr key={s.name} style={{ borderBottom: '1px solid var(--border)' }}>
-                  <td style={{ padding: 6, textAlign: 'center', fontSize: 12 }}>{s.order}</td>
-                  <td style={{ padding: 6, textAlign: 'center', fontSize: 12 }}>{s.grade}</td>
-                  <td style={{ padding: 6, textAlign: 'center', fontSize: 12 }}>{s.class}</td>
-                  <td style={{ padding: 6, textAlign: 'center', fontSize: 12 }}>{s.number}</td>
+                <tr
+                  key={s.name}
+                  style={{
+                    borderBottom: '1px solid var(--border)',
+                    background: hoverIndex === idx ? 'rgba(250, 204, 21, 0.18)' : 'transparent',
+                    transition: 'background-color 0.12s ease-out',
+                  }}
+                  onMouseEnter={() => setHoverIndex(idx)}
+                  onMouseLeave={() => setHoverIndex(null)}
+                >
+                  <td style={{ padding: 6, textAlign: 'center', fontSize: 12, color: 'var(--text-muted)' }}>{s.order}</td>
                   <td style={{ padding: 8 }}>{s.name}</td>
-                  <td style={{ padding: 8, textAlign: 'center' }}>
+                  <td style={{ padding: 4, textAlign: 'center', verticalAlign: 'middle' }}>
                     <button
                       type="button"
                       onClick={() => toggleStatus(s.name)}
                       style={{
                         width: 56,
-                        height: 32,
+                        height: 30,
                         border: '1px solid var(--border)',
                         borderRadius: 6,
                         background: rec?.status ? 'var(--yellow-400)' : 'var(--white)',
@@ -153,7 +161,10 @@ export default function AttendanceModal({ weekStart, cell, subjectInfo, attendan
                       {rec?.status || ''}
                     </button>
                   </td>
-                  <td style={{ padding: 8 }}>
+                  <td style={{ padding: 6, textAlign: 'center', fontSize: 12 }}>{s.grade}</td>
+                  <td style={{ padding: 6, textAlign: 'center', fontSize: 12 }}>{s.class}</td>
+                  <td style={{ padding: 6, textAlign: 'center', fontSize: 12 }}>{s.number}</td>
+                  <td style={{ padding: 4, verticalAlign: 'middle' }}>
                     <input
                       type="text"
                       defaultValue={rec?.note}
@@ -162,7 +173,7 @@ export default function AttendanceModal({ weekStart, cell, subjectInfo, attendan
                         if (v !== (rec?.note ?? '')) onChange(s.name, rec?.status ?? '', v);
                       }}
                       placeholder="비고"
-                      style={{ width: '100%', padding: '4px 6px', border: '1px solid var(--border)', borderRadius: 6, fontSize: 12 }}
+                      style={{ width: '100%', height: 30, padding: '4px 6px', border: '1px solid var(--border)', borderRadius: 6, fontSize: 12 }}
                     />
                   </td>
                 </tr>

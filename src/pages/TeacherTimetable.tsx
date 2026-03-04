@@ -44,6 +44,9 @@ export default function TeacherTimetable() {
   const [weekStart, setWeekStart] = useState(() => getCurrentWeekRange().start);
   const [modalCell, setModalCell] = useState<{ dayindex: number; period: number; subjectKey: string; subject: string; room: string; teachers: string[] } | null>(null);
   const [exportOpen, setExportOpen] = useState(false);
+  const [hasUnsaved, setHasUnsaved] = useState(false);
+  const [pendingCell, setPendingCell] = useState<{ dayindex: number; period: number } | null>(null);
+  const [showUnsavedConfirm, setShowUnsavedConfirm] = useState(false);
 
   const weekRange = useMemo(() => {
     const start = weekStart;
@@ -118,7 +121,7 @@ export default function TeacherTimetable() {
     return set;
   }, [myTimetable]);
 
-  const handleCellClick = (dayindex: number, period: number) => {
+  const openModalForCell = (dayindex: number, period: number) => {
     const cell = myTimetable[period - 1]?.[dayindex];
     if (!cell) return;
     const subj = findSubject(subjects, cell.subjectKey, cell.subject);
@@ -130,6 +133,22 @@ export default function TeacherTimetable() {
       room: cell.room,
       teachers: subj?.teachers ?? [],
     });
+    setHasUnsaved(false);
+  };
+
+  const handleCellClick = (dayindex: number, period: number) => {
+    const cell = myTimetable[period - 1]?.[dayindex];
+    if (!cell) return;
+    if (
+      modalCell &&
+      hasUnsaved &&
+      (modalCell.dayindex !== dayindex || modalCell.period !== period || modalCell.subjectKey !== cell.subjectKey)
+    ) {
+      setPendingCell({ dayindex, period });
+      setShowUnsavedConfirm(true);
+      return;
+    }
+    openModalForCell(dayindex, period);
   };
 
   /** 모달 내 출결/비고 변경 – 로컬 상태만 갱신 (실제 저장은 저장 버튼에서 한 번에 수행) */
@@ -142,6 +161,7 @@ export default function TeacherTimetable() {
       );
       return [...rest, { date, dayindex: modalCell.dayindex, period: modalCell.period, subjectKey: modalCell.subjectKey, studentName, status, note }];
     });
+    setHasUnsaved(true);
   };
 
   /** 현재 칸의 출결 현황을 스프레드시트에 저장 */
@@ -174,6 +194,7 @@ export default function TeacherTimetable() {
       })
     );
     window.alert('저장되었습니다.');
+    setHasUnsaved(false);
   };
 
   /** 현재 칸의 출결·비고 입력값을 모두 지움 (로컬 상태) */
@@ -185,6 +206,7 @@ export default function TeacherTimetable() {
         r => !(r.date === date && r.dayindex === modalCell.dayindex && r.period === modalCell.period && r.subjectKey === modalCell.subjectKey)
       )
     );
+    setHasUnsaved(true);
   };
 
   const handleDownloadXlsx = async (dayindex: number, period: number) => {
@@ -217,7 +239,7 @@ export default function TeacherTimetable() {
 
   return (
     <div style={{ display: 'flex', width: '100%', minHeight: '100vh', fontFamily: "'Open Sans', 'Malgun Gothic', sans-serif" }}>
-      <div style={{ flex: modalCell ? '0 0 60%' : 1, padding: 24, overflow: 'auto', transition: 'flex 0.2s', minWidth: 0 }}>
+      <div style={{ flex: modalCell ? '0 0 50%' : 1, padding: 24, overflow: 'auto', transition: 'flex 0.2s', minWidth: 0 }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12, marginBottom: 12 }}>
         <h1 style={{ margin: 0, fontSize: 20 }}>{teacherName} 선생님 시간표</h1>
         <div style={{ display: 'flex', gap: 8 }}>
@@ -338,6 +360,79 @@ export default function TeacherTimetable() {
           attendanceRecords={attendanceRecords}
           onClose={() => setExportOpen(false)}
         />
+      )}
+
+      {showUnsavedConfirm && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0,0,0,0.35)',
+            zIndex: 1500,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          <div
+            style={{
+              background: 'var(--white)',
+              padding: 20,
+              borderRadius: 12,
+              boxShadow: '0 8px 24px var(--shadow)',
+              width: 320,
+            }}
+          >
+            <p style={{ marginTop: 0, marginBottom: 16, fontSize: 14 }}>
+              저장하지 않은 출결 현황이 있습니다. 저장하시겠습니까?
+            </p>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+              <button
+                type="button"
+                onClick={async () => {
+                  await handleSaveAttendanceAll();
+                  setShowUnsavedConfirm(false);
+                  const target = pendingCell;
+                  setPendingCell(null);
+                  if (target) openModalForCell(target.dayindex, target.period);
+                }}
+                style={{
+                  padding: '8px 14px',
+                  borderRadius: 8,
+                  border: 'none',
+                  background: 'var(--accent)',
+                  color: 'var(--white)',
+                  fontWeight: 600,
+                  fontSize: 14,
+                  cursor: 'pointer',
+                }}
+              >
+                저장
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowUnsavedConfirm(false);
+                  setHasUnsaved(false);
+                  const target = pendingCell;
+                  setPendingCell(null);
+                  if (target) openModalForCell(target.dayindex, target.period);
+                }}
+                style={{
+                  padding: '8px 14px',
+                  borderRadius: 8,
+                  border: '1px solid var(--border)',
+                  background: 'var(--white)',
+                  color: 'var(--text-muted)',
+                  fontSize: 14,
+                  cursor: 'pointer',
+                }}
+              >
+                취소
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
