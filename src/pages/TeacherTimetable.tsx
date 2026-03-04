@@ -6,7 +6,7 @@ import { FileSpreadsheet, Calendar } from 'lucide-react';
 import { getCurrentWeekRange, formatWeekLabel, isToday, dateToYMD } from '@/utils/weekRange';
 import { readSubjects, readTimetable } from '@/api/sheets';
 import { readAttendance, setAttendanceCell } from '@/api/attendance';
-import type { TimetableCell } from '@/types';
+import type { TimetableCell, SubjectStudent } from '@/types';
 import AttendanceModal from '@/components/AttendanceModal';
 import ExportClassAttendance from '@/components/ExportClassAttendance';
 
@@ -18,7 +18,7 @@ function normKey(s: string): string {
   return (s ?? '').trim().toLowerCase().replace(/\s+/g, '').replace(/\u00a0/g, '');
 }
 function findSubject(
-  subjects: Array<{ subjectKey: string; subject: string; teachers: string[]; students: Array<{ name: string }> }>,
+  subjects: Array<{ time: string; subject: string; subjectKey: string; room: string; teachers: string[]; students: SubjectStudent[] }>,
   subjectKey: string,
   subjectName?: string
 ) {
@@ -36,7 +36,7 @@ export default function TeacherTimetable() {
   const nav = useNavigate();
   const teacherName = localStorage.getItem('moving_attendance_teacher_name');
   const spreadsheetId = localStorage.getItem('moving_attendance_spreadsheet_id');
-  const [subjects, setSubjects] = useState<Array<{ time: string; subject: string; subjectKey: string; room: string; teachers: string[]; students: Array<{ name: string }> }>>([]);
+  const [subjects, setSubjects] = useState<Array<{ time: string; subject: string; subjectKey: string; room: string; teachers: string[]; students: SubjectStudent[] }>>([]);
   const [timetableRows, setTimetableRows] = useState<Array<{ teachername: string; dayindex: number; period: number; subject: string; room: string }>>([]);
   const [attendanceRecords, setAttendanceRecords] = useState<Array<{ date: string; dayindex: number; period: number; subjectKey: string; studentName: string; status: string; note: string }>>([]);
   const [loading, setLoading] = useState(true);
@@ -98,7 +98,7 @@ export default function TeacherTimetable() {
       if (r.period >= 1 && r.period <= 7 && r.dayindex >= 0 && r.dayindex <= 4) {
         const subj = findSubject(subjects, r.subject, r.subject);
         grid[r.period - 1][r.dayindex] = {
-          subject: subj ? subj.subject : r.subject,
+          subject: subj ? `${subj.time}${subj.subject}` : r.subject,
           room: r.room,
           subjectKey: r.subject,
           timeLabel: `${DAY_LABELS[r.dayindex]} ${r.period}교시`,
@@ -107,6 +107,16 @@ export default function TeacherTimetable() {
     }
     return grid;
   }, [timetableRows, teacherName, subjects]);
+
+  const mySubjectKeys = useMemo(() => {
+    const set = new Set<string>();
+    for (const row of myTimetable) {
+      for (const cell of row) {
+        if (cell) set.add(cell.subjectKey);
+      }
+    }
+    return set;
+  }, [myTimetable]);
 
   const handleCellClick = (dayindex: number, period: number) => {
     const cell = myTimetable[period - 1]?.[dayindex];
@@ -122,18 +132,10 @@ export default function TeacherTimetable() {
     });
   };
 
-  const handleSaveAttendance = async (studentName: string, status: string, note: string) => {
-    if (!modalCell || !spreadsheetId || !teacherName) return;
+  /** 모달 내 출결/비고 변경 – 로컬 상태만 갱신 (실제 저장은 저장 버튼에서 한 번에 수행) */
+  const handleAttendanceChange = (studentName: string, status: string, note: string) => {
+    if (!modalCell) return;
     const date = dateToYMD(addDays(weekRange.start, modalCell.dayindex));
-    await setAttendanceCell(spreadsheetId, teacherName, {
-      date,
-      dayindex: modalCell.dayindex,
-      period: modalCell.period,
-      subjectKey: modalCell.subjectKey,
-      studentName,
-      status,
-      note,
-    });
     setAttendanceRecords(prev => {
       const rest = prev.filter(
         r => !(r.date === date && r.dayindex === modalCell.dayindex && r.period === modalCell.period && r.subjectKey === modalCell.subjectKey && r.studentName === studentName)
@@ -142,11 +144,54 @@ export default function TeacherTimetable() {
     });
   };
 
+  /** 현재 칸의 출결 현황을 스프레드시트에 저장 */
+  const handleSaveAttendanceAll = async () => {
+    if (!modalCell || !spreadsheetId || !teacherName) return;
+    const date = dateToYMD(addDays(weekRange.start, modalCell.dayindex));
+    const subj = findSubject(subjects, modalCell.subjectKey, modalCell.subject);
+    const students: SubjectStudent[] = subj?.students ?? [];
+    const map = new Map<string, { status: string; note: string }>();
+    for (const r of attendanceRecords) {
+      if (r.date === date && r.dayindex === modalCell.dayindex && r.period === modalCell.period && r.subjectKey === modalCell.subjectKey) {
+        map.set(r.studentName, { status: r.status, note: r.note });
+      }
+    }
+    await Promise.all(
+      students.map(s => {
+        const rec = map.get(s.name) ?? { status: '', note: '' };
+        return setAttendanceCell(spreadsheetId, teacherName, {
+          date,
+          dayindex: modalCell.dayindex,
+          period: modalCell.period,
+          subjectKey: modalCell.subjectKey,
+          grade: s.grade,
+          class: s.class,
+          number: s.number,
+          studentName: s.name,
+          status: rec.status,
+          note: rec.note,
+        });
+      })
+    );
+    window.alert('저장되었습니다.');
+  };
+
+  /** 현재 칸의 출결·비고 입력값을 모두 지움 (로컬 상태) */
+  const handleResetAttendance = () => {
+    if (!modalCell) return;
+    const date = dateToYMD(addDays(weekRange.start, modalCell.dayindex));
+    setAttendanceRecords(prev =>
+      prev.filter(
+        r => !(r.date === date && r.dayindex === modalCell.dayindex && r.period === modalCell.period && r.subjectKey === modalCell.subjectKey)
+      )
+    );
+  };
+
   const handleDownloadXlsx = async (dayindex: number, period: number) => {
     const cell = myTimetable[period - 1]?.[dayindex];
     if (!cell) return;
     const date = dateToYMD(addDays(weekRange.start, dayindex));
-    const subj = subjects.find(s => s.subjectKey === cell.subjectKey);
+    const subj = findSubject(subjects, cell.subjectKey, cell.subject);
     const records = attendanceRecords.filter(
       r => r.date === date && r.dayindex === dayindex && r.period === period && r.subjectKey === cell.subjectKey
     );
@@ -206,7 +251,7 @@ export default function TeacherTimetable() {
         <table style={{ width: '100%', maxWidth: 640, minWidth: 480, borderCollapse: 'collapse', background: 'var(--white)', borderRadius: 10, overflow: 'hidden', boxShadow: '0 2px 8px var(--shadow)', fontSize: 13 }}>
           <thead>
             <tr>
-              <th style={{ padding: 8, background: 'var(--timetable-red)', color: 'var(--text)', width: 52, fontSize: 12 }}>교시</th>
+              <th style={{ padding: 8, background: 'var(--timetable-red)', color: 'var(--text)', width: 52, fontSize: 12, textAlign: 'center' }}>교시</th>
               {weekRange.labels.map((l, i) => (
                 <th key={i} style={{ padding: 8, background: isToday(l.date) ? 'var(--today-bg)' : 'var(--timetable-red)', color: 'var(--text)', fontSize: 12 }}>
                   {l.label}
@@ -217,11 +262,12 @@ export default function TeacherTimetable() {
           <tbody>
             {[1, 2, 3, 4, 5, 6, 7].map(period => (
               <tr key={period}>
-                <td style={{ padding: 6, background: 'var(--timetable-red-light)', fontWeight: 600, fontSize: 12 }}>{PERIOD_LABELS[period - 1]}</td>
+                <td style={{ padding: 6, background: 'var(--timetable-red-light)', fontWeight: 600, fontSize: 12, textAlign: 'center' }}>{PERIOD_LABELS[period - 1]}</td>
                 {[0, 1, 2, 3, 4].map(dayindex => {
                   const cell = myTimetable[period - 1]?.[dayindex];
                   const dayDate = addDays(weekRange.start, dayindex);
                   const isTodayCell = isToday(dayDate);
+                  const hasRoom = cell && cell.room && cell.room !== '-';
                   return (
                     <td
                       key={dayindex}
@@ -246,9 +292,11 @@ export default function TeacherTimetable() {
                           onClick={() => handleCellClick(dayindex, period)}
                         >
                           <div style={{ fontWeight: 700, marginBottom: 2, fontSize: 12 }}>{cell.subject}</div>
-                          <div style={{ fontSize: 11, color: 'var(--text)', background: 'var(--yellow-400)', padding: '2px 4px', borderRadius: 4, display: 'inline-block' }}>
-                            {cell.room}
-                          </div>
+                          {hasRoom && (
+                            <div style={{ fontSize: 11, color: 'var(--text)', background: 'var(--yellow-400)', padding: '2px 4px', borderRadius: 4, display: 'inline-block' }}>
+                              {cell.room}
+                            </div>
+                          )}
                           <button
                             onClick={(e) => { e.stopPropagation(); handleDownloadXlsx(dayindex, period); }}
                             style={{ position: 'absolute', top: 4, right: 4, padding: 2, border: 'none', background: 'transparent', cursor: 'pointer' }}
@@ -258,7 +306,7 @@ export default function TeacherTimetable() {
                           </button>
                         </div>
                       ) : (
-                        <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>—</span>
+                        <span style={{ fontSize: 12 }} />
                       )}
                     </td>
                   );
@@ -276,14 +324,16 @@ export default function TeacherTimetable() {
           cell={modalCell}
           subjectInfo={findSubject(subjects, modalCell.subjectKey, modalCell.subject)}
           attendanceRecords={attendanceRecords}
-          onSave={handleSaveAttendance}
+          onChange={handleAttendanceChange}
+          onSave={handleSaveAttendanceAll}
+          onReset={handleResetAttendance}
           onClose={() => setModalCell(null)}
         />
       )}
 
       {exportOpen && (
         <ExportClassAttendance
-          subjects={subjects}
+          subjects={subjects.filter(s => mySubjectKeys.has(s.subjectKey))}
           weekStart={weekRange.start}
           attendanceRecords={attendanceRecords}
           onClose={() => setExportOpen(false)}

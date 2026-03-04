@@ -2,19 +2,25 @@ import { useMemo } from 'react';
 import { addDays } from 'date-fns';
 import { X } from 'lucide-react';
 import { dateToYMD } from '@/utils/weekRange';
+import type { SubjectStudent } from '@/types';
 
 const DAY_LABELS = ['월', '화', '수', '목', '금'];
 
 type Props = {
   weekStart: Date;
   cell: { dayindex: number; period: number; subjectKey: string; subject: string; room: string; teachers: string[] };
-  subjectInfo?: { students: Array<{ name: string }>; teachers: string[] };
+  subjectInfo?: { students: SubjectStudent[]; teachers: string[] };
   attendanceRecords: Array<{ date: string; dayindex: number; period: number; subjectKey: string; studentName: string; status: string; note: string }>;
-  onSave: (studentName: string, status: string, note: string) => void;
+  /** 개별 학생의 출결/비고 변경 (로컬 상태만 업데이트) */
+  onChange: (studentName: string, status: string, note: string) => void;
+  /** 현재 칸의 출결 현황을 스프레드시트에 저장 */
+  onSave: () => void;
+  /** 현재 칸의 출결·비고 입력값 초기화 */
+  onReset: () => void;
   onClose: () => void;
 };
 
-export default function AttendanceModal({ weekStart, cell, subjectInfo, attendanceRecords, onSave, onClose }: Props) {
+export default function AttendanceModal({ weekStart, cell, subjectInfo, attendanceRecords, onChange, onSave, onReset, onClose }: Props) {
   const date = dateToYMD(addDays(weekStart, cell.dayindex));
   const timeLabel = `${DAY_LABELS[cell.dayindex]} ${cell.period}교시`;
 
@@ -34,14 +40,11 @@ export default function AttendanceModal({ weekStart, cell, subjectInfo, attendan
   const toggleStatus = (name: string) => {
     const cur = recordMap.get(name);
     const next = cur?.status === '/' ? '' : '/';
-    onSave(name, next, cur?.note ?? '');
+    onChange(name, next, cur?.note ?? '');
   };
 
   const handleSaveAll = () => {
-    students.forEach(s => {
-      const rec = recordMap.get(s.name);
-      onSave(s.name, rec?.status ?? '', rec?.note ?? '');
-    });
+    onSave();
   };
 
   return (
@@ -56,6 +59,7 @@ export default function AttendanceModal({ weekStart, cell, subjectInfo, attendan
         flexDirection: 'column',
         overflow: 'hidden',
         fontFamily: "'Open Sans', 'Malgun Gothic', sans-serif",
+        animation: 'slideInRight 0.25s ease-out',
       }}
     >
       <div style={{ padding: 16, borderBottom: '1px solid var(--border)', flexShrink: 0 }}>
@@ -70,49 +74,74 @@ export default function AttendanceModal({ weekStart, cell, subjectInfo, attendan
             <X size={24} />
           </button>
         </div>
-        <button
-          type="button"
-          onClick={handleSaveAll}
-          style={{
-            marginTop: 12,
-            width: '100%',
-            padding: 12,
-            background: 'var(--accent)',
-            color: 'var(--white)',
-            border: 'none',
-            borderRadius: 8,
-            fontWeight: 600,
-            cursor: 'pointer',
-            fontSize: 14,
-          }}
-        >
-          출결 현황 저장하기
-        </button>
+        <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+          <button
+            type="button"
+            onClick={handleSaveAll}
+            style={{
+              flex: 2,
+              padding: 10,
+              background: 'var(--accent)',
+              color: 'var(--white)',
+              border: 'none',
+              borderRadius: 8,
+              fontWeight: 600,
+              cursor: 'pointer',
+              fontSize: 14,
+            }}
+          >
+            출결 현황 저장하기
+          </button>
+          <button
+            type="button"
+            onClick={onReset}
+            style={{
+              flex: 1,
+              padding: 10,
+              background: 'var(--white)',
+              color: 'var(--text-muted)',
+              border: '1px solid var(--border)',
+              borderRadius: 8,
+              fontSize: 13,
+              cursor: 'pointer',
+            }}
+          >
+            초기화
+          </button>
+        </div>
       </div>
       <div style={{ flex: 1, overflow: 'auto', padding: 16 }}>
         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
           <thead>
             <tr>
+              <th style={{ textAlign: 'center', padding: 8, borderBottom: '1px solid var(--border)', width: 40 }}>연번</th>
+              <th style={{ textAlign: 'center', padding: 8, borderBottom: '1px solid var(--border)', width: 48 }}>학년</th>
+              <th style={{ textAlign: 'center', padding: 8, borderBottom: '1px solid var(--border)', width: 48 }}>반</th>
+              <th style={{ textAlign: 'center', padding: 8, borderBottom: '1px solid var(--border)', width: 56 }}>번호</th>
               <th style={{ textAlign: 'left', padding: 8, borderBottom: '1px solid var(--border)' }}>수강생 이름</th>
-              <th style={{ textAlign: 'center', padding: 8, borderBottom: '1px solid var(--border)', width: 72 }}>{timeLabel}</th>
-              <th style={{ textAlign: 'left', padding: 8, borderBottom: '1px solid var(--border)' }}>비고</th>
+              <th style={{ textAlign: 'center', padding: 8, borderBottom: '1px solid var(--border)', width: 96 }}>출결현황</th>
+              <th style={{ textAlign: 'left', padding: 8, borderBottom: '1px solid var(--border)', width: 120 }}>비고</th>
             </tr>
           </thead>
           <tbody>
             {students.length === 0 && (
-              <tr><td colSpan={3} style={{ padding: 16, color: 'var(--text-muted)', textAlign: 'center' }}>수강생 목록은 관리자 시트(과목출석부)에서 불러옵니다.</td></tr>
+              <tr><td colSpan={7} style={{ padding: 16, color: 'var(--text-muted)', textAlign: 'center' }}>수강생 목록은 관리자 시트(과목출석부)에서 불러옵니다.</td></tr>
             )}
             {students.map(s => {
               const rec = recordMap.get(s.name);
               return (
                 <tr key={s.name} style={{ borderBottom: '1px solid var(--border)' }}>
+                  <td style={{ padding: 6, textAlign: 'center', fontSize: 12 }}>{s.order}</td>
+                  <td style={{ padding: 6, textAlign: 'center', fontSize: 12 }}>{s.grade}</td>
+                  <td style={{ padding: 6, textAlign: 'center', fontSize: 12 }}>{s.class}</td>
+                  <td style={{ padding: 6, textAlign: 'center', fontSize: 12 }}>{s.number}</td>
                   <td style={{ padding: 8 }}>{s.name}</td>
                   <td style={{ padding: 8, textAlign: 'center' }}>
                     <button
                       type="button"
                       onClick={() => toggleStatus(s.name)}
                       style={{
-                        width: 40,
+                        width: 56,
                         height: 32,
                         border: '1px solid var(--border)',
                         borderRadius: 6,
@@ -130,10 +159,10 @@ export default function AttendanceModal({ weekStart, cell, subjectInfo, attendan
                       defaultValue={rec?.note}
                       onBlur={(e) => {
                         const v = e.target.value.trim();
-                        if (v !== (rec?.note ?? '')) onSave(s.name, rec?.status ?? '', v);
+                        if (v !== (rec?.note ?? '')) onChange(s.name, rec?.status ?? '', v);
                       }}
                       placeholder="비고"
-                      style={{ width: '100%', padding: '6px 8px', border: '1px solid var(--border)', borderRadius: 6 }}
+                      style={{ width: '100%', padding: '4px 6px', border: '1px solid var(--border)', borderRadius: 6, fontSize: 12 }}
                     />
                   </td>
                 </tr>

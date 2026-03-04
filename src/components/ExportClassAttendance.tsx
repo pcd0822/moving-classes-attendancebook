@@ -4,6 +4,7 @@ import { ko } from 'date-fns/locale';
 import { X, FileDown, FileText } from 'lucide-react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import type { SubjectStudent } from '@/types';
 
 type SubjectRow = {
   time: string;
@@ -11,7 +12,7 @@ type SubjectRow = {
   subjectKey: string;
   room: string;
   teachers: string[];
-  students: Array<{ name: string }>;
+  students: SubjectStudent[];
 };
 
 type Props = {

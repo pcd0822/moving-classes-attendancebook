@@ -17,7 +17,18 @@ export async function readAttendance(spreadsheetId: string, teacherName: string)
 export async function setAttendanceCell(
   spreadsheetId: string,
   teacherName: string,
-  p: { date: string; dayindex: number; period: number; subjectKey: string; studentName: string; status: string; note: string }
+  p: {
+    date: string;
+    dayindex: number;
+    period: number;
+    subjectKey: string;
+    studentName: string;
+    status: string;
+    note: string;
+    grade?: string;
+    class?: string;
+    number?: string;
+  }
 ) {
   return post({ action: 'setCell', spreadsheetId, teacherName, ...p });
 }

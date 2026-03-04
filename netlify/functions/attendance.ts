@@ -96,19 +96,27 @@ export const handler: Handler = async (event: HandlerEvent, _context: HandlerCon
     if (action === 'read') {
       const res = await sheets.spreadsheets.values.get({
         spreadsheetId: id,
-        range: `'${sheetTitle}'!A:G`,
+        range: `'${sheetTitle}'!A:J`,
       }).catch(() => ({ data: { values: [] } }));
       const values = (res.data.values || []) as string[][];
       const [header, ...rows] = values;
       if (!header || header[0] !== 'date') return { statusCode: 200, headers, body: JSON.stringify({ records: [] }) };
+
+      const idxDay = header.indexOf('dayindex');
+      const idxPeriod = header.indexOf('period');
+      const idxSubjectKey = header.indexOf('subjectKey');
+      const idxStudentName = header.indexOf('studentName');
+      const idxStatus = header.indexOf('status');
+      const idxNote = header.indexOf('note');
+
       const records = rows.map(row => ({
         date: row[0],
-        dayindex: Number(row[1]) || 0,
-        period: Number(row[2]) || 0,
-        subjectKey: row[3],
-        studentName: row[4],
-        status: row[5] || '',
-        note: row[6] || '',
+        dayindex: Number(idxDay >= 0 ? row[idxDay] : row[1]) || 0,
+        period: Number(idxPeriod >= 0 ? row[idxPeriod] : row[2]) || 0,
+        subjectKey: idxSubjectKey >= 0 ? row[idxSubjectKey] : row[3],
+        studentName: idxStudentName >= 0 ? row[idxStudentName] : row[4],
+        status: (idxStatus >= 0 ? row[idxStatus] : row[5]) || '',
+        note: (idxNote >= 0 ? row[idxNote] : row[6]) || '',
       }));
       return { statusCode: 200, headers, body: JSON.stringify({ records }) };
     }
@@ -116,10 +124,10 @@ export const handler: Handler = async (event: HandlerEvent, _context: HandlerCon
     if (action === 'write') {
       const { records } = rest as { records: Array<{ date: string; dayindex: number; period: number; subjectKey: string; studentName: string; status: string; note: string }> };
       await ensureSheet();
-      const rows = records.map(r => [r.date, r.dayindex, r.period, r.subjectKey, r.studentName, r.status, r.note]);
+      const rows = records.map(r => [r.date, r.dayindex, r.period, r.subjectKey, '', '', '', r.studentName, r.status, r.note]);
       const res = await sheets.spreadsheets.values.get({
         spreadsheetId: id,
-        range: `'${sheetTitle}'!A:G`,
+        range: `'${sheetTitle}'!A:J`,
       }).catch(() => ({ data: { values: [] } }));
       const values = (res.data.values || []) as string[][];
       if (values.length === 0) {
@@ -127,12 +135,12 @@ export const handler: Handler = async (event: HandlerEvent, _context: HandlerCon
           spreadsheetId: id,
           range: `'${sheetTitle}'!A1`,
           valueInputOption: 'USER_ENTERED',
-          requestBody: { values: [['date', 'dayindex', 'period', 'subjectKey', 'studentName', 'status', 'note'], ...rows] },
+          requestBody: { values: [['date', 'dayindex', 'period', 'subjectKey', 'grade', 'class', 'number', 'studentName', 'status', 'note'], ...rows] },
         });
       } else {
         await sheets.spreadsheets.values.append({
           spreadsheetId: id,
-          range: `'${sheetTitle}'!A:G`,
+          range: `'${sheetTitle}'!A:J`,
           valueInputOption: 'USER_ENTERED',
           insertDataOption: 'INSERT_ROWS',
           requestBody: { values: rows },
@@ -142,17 +150,17 @@ export const handler: Handler = async (event: HandlerEvent, _context: HandlerCon
     }
 
     if (action === 'setCell') {
-      const { date, dayindex, period, subjectKey, studentName, status, note } = rest as {
-        date: string; dayindex: number; period: number; subjectKey: string; studentName: string; status: string; note: string;
+      const { date, dayindex, period, subjectKey, grade, class: klass, number, studentName, status, note } = rest as {
+        date: string; dayindex: number; period: number; subjectKey: string; grade?: string; class?: string; number?: string; studentName: string; status: string; note: string;
       };
       await ensureSheet();
       const res = await sheets.spreadsheets.values.get({
         spreadsheetId: id,
-        range: `'${sheetTitle}'!A:G`,
+        range: `'${sheetTitle}'!A:J`,
       }).catch(() => ({ data: { values: [] } }));
       let values = (res.data.values || []) as string[][];
       if (values.length === 0) {
-        values = [['date', 'dayindex', 'period', 'subjectKey', 'studentName', 'status', 'note']];
+        values = [['date', 'dayindex', 'period', 'subjectKey', 'grade', 'class', 'number', 'studentName', 'status', 'note']];
         await sheets.spreadsheets.values.update({
           spreadsheetId: id,
           range: `'${sheetTitle}'!A1`,
@@ -161,28 +169,72 @@ export const handler: Handler = async (event: HandlerEvent, _context: HandlerCon
         });
       }
       const [header, ...dataRows] = values;
+
+      const idxDate = 0;
+      const idxDay = header.indexOf('dayindex');
+      const idxPeriod = header.indexOf('period');
+      const idxSubjectKey = header.indexOf('subjectKey');
+      const idxGrade = header.indexOf('grade');
+      const idxClass = header.indexOf('class');
+      const idxNumber = header.indexOf('number');
+      const idxStudentName = header.indexOf('studentName');
+      const idxStatus = header.indexOf('status');
+      const idxNote = header.indexOf('note');
+
       let rowIndex = -1;
       for (let i = 0; i < dataRows.length; i++) {
         const r = dataRows[i];
-        if (r[0] === date && Number(r[1]) === dayindex && Number(r[2]) === period && r[3] === subjectKey && r[4] === studentName) {
+        const rowDate = r[idxDate];
+        const rowDay = Number(idxDay >= 0 ? r[idxDay] : r[1]);
+        const rowPeriod = Number(idxPeriod >= 0 ? r[idxPeriod] : r[2]);
+        const rowSubjectKey = idxSubjectKey >= 0 ? r[idxSubjectKey] : r[3];
+        const rowStudentName = idxStudentName >= 0 ? r[idxStudentName] : r[4];
+        if (rowDate === date && rowDay === dayindex && rowPeriod === period && rowSubjectKey === subjectKey && rowStudentName === studentName) {
           rowIndex = i + 2;
           break;
         }
       }
       if (rowIndex > 0) {
+        const cols = ['A','B','C','D','E','F','G','H','I','J','K'];
+        const statusCol = cols[idxStatus >= 0 ? idxStatus : 5];
+        const noteCol = cols[idxNote >= 0 ? idxNote : 6];
+        // 학년/반/번호도 최신 값으로 덮어씀
+        if (idxGrade >= 0 || idxClass >= 0 || idxNumber >= 0) {
+          const gradeCol = cols[idxGrade >= 0 ? idxGrade : 4];
+          const classCol = cols[idxClass >= 0 ? idxClass : 5];
+          const numberCol = cols[idxNumber >= 0 ? idxNumber : 6];
+          await sheets.spreadsheets.values.update({
+            spreadsheetId: id,
+            range: `'${sheetTitle}'!${gradeCol}${rowIndex}:${numberCol}${rowIndex}`,
+            valueInputOption: 'USER_ENTERED',
+            requestBody: { values: [[grade ?? '', klass ?? '', number ?? '']] },
+          });
+        }
         await sheets.spreadsheets.values.update({
           spreadsheetId: id,
-          range: `'${sheetTitle}'!F${rowIndex}:G${rowIndex}`,
+          range: `'${sheetTitle}'!${statusCol}${rowIndex}:${noteCol}${rowIndex}`,
           valueInputOption: 'USER_ENTERED',
           requestBody: { values: [[status, note || '']] },
         });
       } else {
+        const cols = header.length || 10;
+        const row: (string | number)[] = new Array(cols).fill('');
+        row[idxDate] = date;
+        row[idxDay >= 0 ? idxDay : 1] = dayindex;
+        row[idxPeriod >= 0 ? idxPeriod : 2] = period;
+        row[idxSubjectKey >= 0 ? idxSubjectKey : 3] = subjectKey;
+        if (idxGrade >= 0) row[idxGrade] = grade ?? '';
+        if (idxClass >= 0) row[idxClass] = klass ?? '';
+        if (idxNumber >= 0) row[idxNumber] = number ?? '';
+        row[idxStudentName >= 0 ? idxStudentName : 4] = studentName;
+        row[idxStatus >= 0 ? idxStatus : 5] = status;
+        row[idxNote >= 0 ? idxNote : 6] = note || '';
         await sheets.spreadsheets.values.append({
           spreadsheetId: id,
-          range: `'${sheetTitle}'!A:G`,
+          range: `'${sheetTitle}'!A:J`,
           valueInputOption: 'USER_ENTERED',
           insertDataOption: 'INSERT_ROWS',
-          requestBody: { values: [[date, dayindex, period, subjectKey, studentName, status, note || '']] },
+          requestBody: { values: [row] },
         });
       }
       return { statusCode: 200, headers, body: JSON.stringify({ ok: true }) };

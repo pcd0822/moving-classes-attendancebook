@@ -1,26 +1,28 @@
 :root {
   --white: #ffffff;
-  --red-50: #fef2f2;
-  --red-100: #fee2e2;
-  --red-200: #fecaca;
-  --red-300: #fca5a5;
-  --red-500: #ef4444;
-  --red-600: #dc2626;
-  --red-700: #b91c1c;
-  --yellow-400: #facc15;
+  /* 전체 배경·테두리: 부드러운 파스텔톤 */
+  --red-50: #fff7f7;
+  --red-100: #ffe8e8;
+  --red-200: #ffcdd2;
+  --red-300: #ef9a9a;
+  --red-500: #e57373;
+  --red-600: #ef5350;
+  --red-700: #d32f2f;
+  --yellow-400: #facc15; /* 현재 학급(하이라이트) 용 포인트 */
   --yellow-500: #eab308;
   --yellow-600: #ca8a04;
   --text: #1f2937;
   --text-muted: #6b7280;
-  --border: #e5e7eb;
-  /* 시간표: 흰 배경 + 연한 빨강 헤더, 오늘은 불투명 노랑 */
-  --timetable-red: #e57373;
-  --timetable-red-light: #ffebee;
-  --timetable-red-border: #fecaca;
-  --today-bg: #fef08a;
-  --shadow: rgba(0, 0, 0, 0.08);
-  --accent: var(--yellow-500);
-  --bg-page: var(--red-50);
+  --border: #f1d5d5;
+  /* 시간표: 흰 배경 + 연한 빨강 헤더, 오늘은 살구색 하이라이트 */
+  --timetable-red: #ffe0e0;
+  --timetable-red-light: #fff4f4;
+  --timetable-red-border: #ffcdd2;
+  /* 날짜(오늘) 배경: 투명한 살구색 */
+  --today-bg: #ffe7c2;
+  --shadow: rgba(0, 0, 0, 0.04);
+  --accent: #e57373;
+  --bg-page: #fffafa;
 }
 
 * {
@@ -61,4 +63,15 @@ a:hover {
 /* 전체 Open Sans 적용 (body 상속 + 테이블/레이블 명시) */
 table, th, td, label, h1, h2, h3, p, span {
   font-family: 'Open Sans', 'Malgun Gothic', sans-serif;
+}
+
+@keyframes slideInRight {
+  from {
+    transform: translateX(32px);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
 }

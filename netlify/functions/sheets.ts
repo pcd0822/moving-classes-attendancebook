@@ -146,17 +146,13 @@ export const handler: Handler = async (event: HandlerEvent, _context: HandlerCon
       const [header, ...data] = values;
       if (!header || header[0] !== 'time') return { statusCode: 200, headers, body: JSON.stringify({ rows: [] }) };
       const rows = data.map(row => {
-        let students: Array<{ name: string }> = [];
+        let students: unknown[] = [];
         try {
           const raw = JSON.parse(row[6] || '[]');
-          if (Array.isArray(raw)) {
-            students = raw
-              .map((s: unknown) => (typeof s === 'object' && s !== null && 'name' in s)
-                ? { name: String((s as { name: unknown }).name).trim() }
-                : null)
-              .filter((x): x is { name: string } => x !== null && x.name !== '');
-          }
-        } catch { /* ignore */ }
+          if (Array.isArray(raw)) students = raw;
+        } catch {
+          students = [];
+        }
         return {
           time: row[0],
           subject: row[1],
