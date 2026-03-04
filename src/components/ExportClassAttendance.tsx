@@ -49,13 +49,23 @@ export default function ExportClassAttendance({ subjects, weekStart, attendanceR
 
   const buildTableData = useMemo(() => {
     if (!subj) return { headers: [] as string[], rows: [] as string[][], noteMap: new Map<string, string>() };
+
+    // 헤더용 날짜 컬럼 키와 (date+dayindex) 매핑을 미리 만들어 둠
+    const dateKeyToColLabel = new Map<string, string>();
+    const dateColLabels = datesInRange.map(d => {
+      const colLabel = format(d.date, 'M/d (EEE)', { locale: ko });
+      const key = `${format(d.date, 'yyyy-MM-dd')}_${d.dayindex}`;
+      dateKeyToColLabel.set(key, colLabel);
+      return colLabel;
+    });
+
     const headers = [
       '연번',
       '학년',
       '반',
       '번호',
       '수강생 이름',
-      ...datesInRange.map(x => format(x.date, 'M/d (EEE)', { locale: ko })),
+      ...dateColLabels,
       '비고',
     ];
     const noteMap = new Map<string, string>();
@@ -73,21 +83,22 @@ export default function ExportClassAttendance({ subjects, weekStart, attendanceR
     for (const r of attendanceRecords) {
       const rKeyNorm = norm(r.subjectKey);
       if (!(rKeyNorm === targetKeyNorm || rKeyNorm === targetNameNorm)) continue;
-      const dateStr = datesInRange.find(d => format(d.date, 'yyyy-MM-dd') === r.date && d.dayindex === r.dayindex);
-      if (!dateStr) continue;
-      const colKey = format(dateStr.date, 'M/d (EEE)', { locale: ko });
+
+      // 시트에 저장된 date/dayindex 조합이 현재 선택한 기간/요일에 포함되는지 확인
+      const key = `${r.date}_${r.dayindex}`;
+      const colKey = dateKeyToColLabel.get(key);
+      if (!colKey) continue;
+
       const rKey = getStudentKey(r);
       if (!statusMap.has(rKey)) statusMap.set(rKey, new Map());
       statusMap.get(rKey)!.set(colKey, r.status);
       if (r.note) noteMap.set(rKey, r.note);
     }
+
     const rows = subj.students.map(s => {
       const sk = getStudentKey(s);
       const note = noteMap.get(sk) ?? '';
-      const cells = datesInRange.map(d => {
-        const colKey = format(d.date, 'M/d (EEE)', { locale: ko });
-        return statusMap.get(sk)?.get(colKey) ?? '';
-      });
+      const cells = dateColLabels.map(colKey => statusMap.get(sk)?.get(colKey) ?? '');
       return [
         String(s.order ?? ''),
         String(s.grade ?? ''),

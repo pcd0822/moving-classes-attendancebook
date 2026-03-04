@@ -1,8 +1,8 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { addDays, format } from 'date-fns';
 import { ko } from 'date-fns/locale';
-import { FileSpreadsheet, Calendar } from 'lucide-react';
+import { FileSpreadsheet, Calendar, ChevronLeft, ChevronRight } from 'lucide-react';
 import { getCurrentWeekRange, formatWeekLabel, isToday, dateToYMD } from '@/utils/weekRange';
 import { readSubjects, readTimetable } from '@/api/sheets';
 import { readAttendance, setAttendanceCell } from '@/api/attendance';
@@ -54,6 +54,8 @@ export default function TeacherTimetable() {
   const [showSavedModal, setShowSavedModal] = useState(false);
   const [showSavingModal, setShowSavingModal] = useState(false);
   const [savingProgress, setSavingProgress] = useState(0);
+  const savingModalTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const saveRunIdRef = useRef(0);
 
   const weekRange = useMemo(() => {
     const start = weekStart;
@@ -92,6 +94,19 @@ export default function TeacherTimetable() {
       }
     })();
   }, [teacherName, spreadsheetId, nav]);
+
+  const shiftWeek = (delta: number) => {
+    setWeekStart(prev => addDays(prev, 7 * delta));
+    // 주차를 이동할 때는 모달/임시 상태를 초기화
+    setModalCell(null);
+    setHasUnsaved(false);
+    setPendingCell(null);
+    setShowUnsavedConfirm(false);
+    setBaselineCellRecords(null);
+  };
+
+  const handlePrevWeek = () => shiftWeek(-1);
+  const handleNextWeek = () => shiftWeek(1);
 
   const reloadAttendance = async () => {
     if (!spreadsheetId || !teacherName) return;
@@ -210,10 +225,17 @@ export default function TeacherTimetable() {
   /** 현재 칸의 출결 현황을 스프레드시트에 저장 */
   const handleSaveAttendanceAll = async (opts?: { silent?: boolean }) => {
     if (!modalCell || !spreadsheetId || !teacherName) return;
+    if (savingModalTimeoutRef.current != null) {
+      clearTimeout(savingModalTimeoutRef.current);
+      savingModalTimeoutRef.current = null;
+    }
+    saveRunIdRef.current += 1;
+    const thisRunId = saveRunIdRef.current;
     setShowSavingModal(true);
     setSavingProgress(0);
-    const date = dateToYMD(addDays(weekRange.start, modalCell.dayindex));
-    const subj = findSubject(subjects, modalCell.subjectKey, modalCell.subject);
+    const cellToSave = modalCell;
+    const date = dateToYMD(addDays(weekRange.start, cellToSave.dayindex));
+    const subj = findSubject(subjects, cellToSave.subjectKey, cellToSave.subject);
     const students: SubjectStudent[] = [...(subj?.students ?? [])].sort((a, b) => {
       const g = (a.grade || '').localeCompare(b.grade || '');
       if (g !== 0) return g;
@@ -226,7 +248,7 @@ export default function TeacherTimetable() {
     });
     const map = new Map<string, { status: string; note: string }>();
     for (const r of attendanceRecords) {
-      if (r.date === date && r.dayindex === modalCell.dayindex && r.period === modalCell.period && r.subjectKey === modalCell.subjectKey) {
+      if (r.date === date && r.dayindex === cellToSave.dayindex && r.period === cellToSave.period && r.subjectKey === cellToSave.subjectKey) {
         map.set(getStudentKey(r), { status: r.status, note: r.note });
       }
     }
@@ -235,40 +257,46 @@ export default function TeacherTimetable() {
     }[] = [];
     const total = students.length || 1;
     let index = 0;
-    for (const s of students) {
-      const rec = map.get(getStudentKey(s)) ?? { status: '', note: '' };
-      await setAttendanceCell(spreadsheetId, teacherName, {
-        date,
-        dayindex: modalCell.dayindex,
-        period: modalCell.period,
-        subjectKey: modalCell.subjectKey,
-        grade: s.grade,
-        class: s.class,
-        number: s.number,
-        studentName: s.name,
-        status: rec.status,
-        note: rec.note,
-      });
-      newBaseline.push({
-        date,
-        dayindex: modalCell.dayindex,
-        period: modalCell.period,
-        subjectKey: modalCell.subjectKey,
-        studentName: s.name,
-        grade: s.grade,
-        class: s.class,
-        number: s.number,
-        status: rec.status,
-        note: rec.note,
-      });
-      index += 1;
-      setSavingProgress(Math.round((index / total) * 100));
+    try {
+      for (const s of students) {
+        const rec = map.get(getStudentKey(s)) ?? { status: '', note: '' };
+        await setAttendanceCell(spreadsheetId, teacherName, {
+          date,
+          dayindex: cellToSave.dayindex,
+          period: cellToSave.period,
+          subjectKey: cellToSave.subjectKey,
+          grade: s.grade,
+          class: s.class,
+          number: s.number,
+          studentName: s.name,
+          status: rec.status,
+          note: rec.note,
+        });
+        newBaseline.push({
+          date,
+          dayindex: cellToSave.dayindex,
+          period: cellToSave.period,
+          subjectKey: cellToSave.subjectKey,
+          studentName: s.name,
+          grade: s.grade,
+          class: s.class,
+          number: s.number,
+          status: rec.status,
+          note: rec.note,
+        });
+        index += 1;
+        setSavingProgress(Math.round((index / total) * 100));
+      }
+      setBaselineCellRecords(newBaseline);
+      if (!opts?.silent) setShowSavedModal(true);
+      setHasUnsaved(false);
+      await reloadAttendance();
+    } finally {
+      savingModalTimeoutRef.current = setTimeout(() => {
+        if (saveRunIdRef.current === thisRunId) setShowSavingModal(false);
+        savingModalTimeoutRef.current = null;
+      }, 300);
     }
-    setBaselineCellRecords(newBaseline);
-    if (!opts?.silent) setShowSavedModal(true);
-    setHasUnsaved(false);
-    await reloadAttendance();
-    setTimeout(() => setShowSavingModal(false), 300);
   };
 
   /** 현재 칸의 출결·비고 입력값을 모두 지움 (로컬 상태) */
@@ -325,12 +353,52 @@ export default function TeacherTimetable() {
           </button>
         </div>
       </div>
-      <p style={{ color: 'var(--text-muted)', marginBottom: 12, fontSize: 13 }}>
-        {formatWeekLabel(weekRange.start)}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, gap: 8 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+          <button
+            type="button"
+            onClick={handlePrevWeek}
+            style={{
+              width: 28,
+              height: 28,
+              borderRadius: 999,
+              border: '1px solid var(--border)',
+              background: 'var(--white)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              cursor: 'pointer',
+            }}
+          >
+            <ChevronLeft size={16} />
+          </button>
+          <div style={{ color: 'var(--text-muted)', fontSize: 13, fontWeight: 600 }}>
+            {formatWeekLabel(weekRange.start)}
+          </div>
+          <button
+            type="button"
+            onClick={handleNextWeek}
+            style={{
+              width: 28,
+              height: 28,
+              borderRadius: 999,
+              border: '1px solid var(--border)',
+              background: 'var(--white)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              cursor: 'pointer',
+            }}
+          >
+            <ChevronRight size={16} />
+          </button>
+        </div>
         {timetableRows.length >= 0 && (
-          <span style={{ marginLeft: 12 }}>· 교사시간표 시트 {timetableRows.length}건 조회됨</span>
+          <div style={{ color: 'var(--text-muted)', fontSize: 12 }}>
+            교사시간표 시트 {timetableRows.length}건 조회됨
+          </div>
         )}
-      </p>
+      </div>
 
       {timetableRows.length > 0 && myTimetable.flat().every(c => c === null) && (
         <p style={{ marginBottom: 16, padding: 12, background: 'var(--red-100)', borderRadius: 8, color: 'var(--text)' }}>
