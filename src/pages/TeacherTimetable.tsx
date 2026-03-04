@@ -322,7 +322,7 @@ export default function TeacherTimetable() {
 
       try {
         const att = await readAttendance(spreadsheetId, teacherName);
-        setAttendanceRecords(prev => [...att.filter(notThisCell), ...newBaseline]);
+        setAttendanceRecords(() => [...att.filter(notThisCell), ...newBaseline]);
       } catch {
         // 시트 재조회 실패해도 방금 저장한 칸은 이미 반영됨
       }
