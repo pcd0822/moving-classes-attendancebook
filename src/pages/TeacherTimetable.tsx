@@ -116,14 +116,24 @@ export default function TeacherTimetable() {
   }, [timetableRows, teacherName, subjects]);
 
   const mySubjectKeys = useMemo(() => {
+    const norm = (s: string) =>
+      (s || '')
+        .trim()
+        .toLowerCase()
+        .replace(/\s+/g, ' ')
+        .replace(/\u00a0/g, ' ')
+        .replace(/\s/g, '');
+    const normalized = norm(teacherName ?? '');
+    const my = timetableRows.filter(r => norm(r.teachername) === normalized);
     const set = new Set<string>();
-    for (const row of myTimetable) {
-      for (const cell of row) {
-        if (cell) set.add(cell.subjectKey);
+    for (const r of my) {
+      if (r.period >= 1 && r.period <= 7 && r.dayindex >= 0 && r.dayindex <= 4) {
+        const subj = findSubject(subjects, r.subject, r.subject);
+        if (subj) set.add(subj.subjectKey);
       }
     }
     return set;
-  }, [myTimetable]);
+  }, [timetableRows, teacherName, subjects]);
 
   const openModalForCell = (dayindex: number, period: number) => {
     const cell = myTimetable[period - 1]?.[dayindex];

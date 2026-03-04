@@ -68,7 +68,7 @@ export default function Guide() {
             <strong style={{ background: 'var(--today-bg)', padding: '2px 6px', borderRadius: 6 }}>구글 스프레드시트 연동</strong>
             {' '}– 관리자가 공유한 출석부용 스프레드시트 주소를 입력합니다. 해당 시트에 관리자 구글 클라우드 서비스 계정이 편집 권한으로 공유되어 있어야 합니다.
             <br />
-            아래 이메일을 복사해서 구글 스프레드시트를 하나 추가한 뒤,&nbsp;
+            위 이메일을 복사해서 구글 스프레드시트를 하나 추가한 뒤,&nbsp;
             <span style={{ background: 'var(--today-bg)', padding: '0 4px', borderRadius: 4 }}>
               "공유" → "사용자 추가 칸에 이메일 입력" → "편집자 권한 부여" → "완료"
             </span>
